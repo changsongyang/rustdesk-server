@@ -56,7 +56,7 @@ enum Data {
     RelayServers(RelayServers),
 }
 
-const REG_TIMEOUT: i32 = 30_000;
+const REG_TIMEOUT: i32 = 100_000; //当使用websocket时，注册间隔时间会很长，改为100
 type TcpStreamSink = SplitSink<Framed<TcpStream, BytesCodec>, Bytes>;
 type WsSink = SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, tungstenite::Message>;
 struct SafeWsSink {
@@ -496,7 +496,7 @@ impl RendezvousServer {
         ws: bool,
     ) -> bool {
         if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(bytes) {
-            // log::debug!("Received TCP message from {}: {:?}", addr, msg_in);
+            log::debug!("Received TCP message from {}: {:?}", addr, msg_in);
             match msg_in.union {
                 Some(rendezvous_message::Union::RegisterPeer(rp)) => {
                     // B registered
