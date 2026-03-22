@@ -23,8 +23,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   LATEST_TAG: latest
-  GHCR_IMAGE: ghcr.io/rustdesk/rustdesk-server-s6
-  GHCR_IMAGE_CLASSIC: ghcr.io/rustdesk/rustdesk-server
+  GHCR_IMAGE: ghcr.io/changsongyang/rustdesk-server-s6
+  GHCR_IMAGE_CLASSIC: ghcr.io/changsongyang/rustdesk-server
   
 jobs:
 
