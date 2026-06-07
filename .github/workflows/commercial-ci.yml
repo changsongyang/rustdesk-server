@@ -23,7 +23,7 @@ jobs:
         with:
           components: rustfmt
       - name: Check formatting
-        run: cd commercial && cargo fmt --all -- --check
+        run: cargo fmt --manifest-path commercial/Cargo.toml --all -- --check
 
   clippy:
     name: Clippy
@@ -39,7 +39,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Run Clippy
-        run: cd commercial && cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --manifest-path commercial/Cargo.toml --all-targets --all-features -- -D warnings
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
@@ -55,7 +55,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cd commercial && cargo test --all --all-features -- --nocapture
+        run: cargo test --manifest-path commercial/Cargo.toml --all --all-features -- --nocapture
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           DATABASE_URL: "sqlite::memory:"
@@ -78,7 +78,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cd commercial && cargo build --release --target ${{ matrix.target }}
+        run: cargo build --manifest-path commercial/Cargo.toml --release --target ${{ matrix.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
