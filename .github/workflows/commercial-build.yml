@@ -68,6 +68,7 @@ jobs:
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           OPENSSL_DIR: /usr
+          OPENSSL_STATIC: 1
 
       - name: Exec chmod
         run: chmod -v a+x commercial/target/${{ matrix.job.target }}/release/*
