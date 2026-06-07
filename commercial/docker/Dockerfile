@@ -17,27 +17,20 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy commercial Cargo files first for better caching
-COPY commercial/Cargo.toml ./
+# Create directory structure
+RUN mkdir -p /build/commercial /build/libs
 
 # Copy hbb_common submodule from root directory
 COPY libs/hbb_common /build/libs/hbb_common
 
-# Create libs directory structure
-RUN mkdir -p /build/libs
-
-# Create dummy main.rs to build dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "" > src/lib.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release && rm -rf src
+# Copy commercial Cargo files first for better caching
+COPY commercial/Cargo.toml /build/commercial/Cargo.toml
 
 # Copy actual commercial source code
-COPY commercial/src ./src
+COPY commercial/src /build/commercial/src
 
 # Build the application
+WORKDIR /build/commercial
 RUN cargo build --release
 
 # ==================== Runtime Stage ====================
@@ -61,7 +54,7 @@ RUN mkdir -p /app/data /app/logs /app/keys && \
     chown -R rustdesk:rustdesk /app
 
 # Copy binary from builder
-COPY --from=builder /build/target/release/rustdesk-pro /app/rustdesk-pro
+COPY --from=builder /build/commercial/target/release/rustdesk-pro /app/rustdesk-pro
 
 # Copy default configuration
 COPY commercial/.env.example /app/.env.example

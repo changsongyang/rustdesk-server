@@ -19,14 +19,17 @@ RUN rm -f /etc/apt/sources.list.d/*.list && \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制商业版 Cargo 文件（用于缓存依赖层）
-COPY commercial/Cargo.toml ./
+# 创建目录结构
+RUN mkdir -p /build/commercial /build/libs
 
 # 复制 hbb_common 子模块（从根目录）
 COPY libs/hbb_common /build/libs/hbb_common
 
-# 创建 libs 目录结构（确保路径正确）
-RUN mkdir -p /build/libs && ln -s /build/libs/hbb_common /build/libs/hbb_common
+# 复制商业版 Cargo 文件（用于缓存依赖层）
+COPY commercial/Cargo.toml /build/commercial/Cargo.toml
+
+# 复制商业版源代码
+COPY commercial/src /build/commercial/src
 
 # 配置国内镜像源加速
 RUN mkdir -p ~/.cargo && \
@@ -45,18 +48,8 @@ EOF
 # 配置 Git 使用国内加速（可选，如 ghproxy）
 # RUN git config --global url."https://ghproxy.com/https://github.com/".insteadOf "https://github.com/"
 
-# 创建虚拟 main.rs 预编译依赖（利用缓存层）
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "" > src/lib.rs
-
-# 预编译依赖（此层会被缓存）
-RUN cargo build --release && rm -rf src
-
-# 复制实际商业版源代码
-COPY commercial/src ./src
-
-# 构建应用
+# 切换到商业版目录并构建
+WORKDIR /build/commercial
 RUN cargo build --release
 
 # ==================== Runtime Stage ====================
@@ -85,7 +78,7 @@ RUN mkdir -p /app/data /app/logs /app/keys && \
     chown -R rustdesk:rustdesk /app
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /build/target/release/rustdesk-pro /app/rustdesk-pro
+COPY --from=builder /build/commercial/target/release/rustdesk-pro /app/rustdesk-pro
 
 # 复制默认配置
 COPY commercial/.env.example /app/.env.example
