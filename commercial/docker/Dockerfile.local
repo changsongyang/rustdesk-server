@@ -7,8 +7,13 @@ FROM rust:1.88 as builder
 
 WORKDIR /build
 
-# 安装构建依赖
-RUN apt-get update && apt-get install -y \
+# 安装构建依赖（使用阿里云 Debian 源）
+# 清除默认源配置，替换为阿里云源
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo 'deb http://mirrors.aliyun.com/debian bookworm main non-free-firmware' > /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian bookworm-updates main non-free-firmware' >> /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     git \
@@ -59,8 +64,13 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# 安装运行时依赖
-RUN apt-get update && apt-get install -y \
+# 安装运行时依赖（使用阿里云 Debian 源）
+# 清除默认源配置，替换为阿里云源
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo 'deb http://mirrors.aliyun.com/debian bookworm main non-free-firmware' > /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian bookworm-updates main non-free-firmware' >> /etc/apt/sources.list && \
+    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
     sqlite3 \

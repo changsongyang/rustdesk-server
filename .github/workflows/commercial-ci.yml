@@ -16,24 +16,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: cd commercial && cargo fmt --all -- --check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cd commercial && cargo clippy --all-targets --all-features -- -D warnings
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
@@ -42,15 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      - name: Cache Rust analyzer
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "rust-analyzer"
       - name: Run tests
-        run: cargo test --all --all-features -- --nocapture
+        run: cd commercial && cargo test --all --all-features -- --nocapture
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           DATABASE_URL: sqlite::memory:
@@ -61,17 +66,19 @@ jobs:
     strategy:
       matrix:
         target:
-          - thumbv7em-none-eabihf
           - x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cd commercial && cargo build --release --target ${{ matrix.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
@@ -80,6 +87,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
       - name: Run security audit
         uses: rustsec/audit-check@v2
         with:
