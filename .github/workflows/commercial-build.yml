@@ -53,6 +53,11 @@ jobs:
       - name: Install cross tool
         run: cargo install cross --git https://github.com/rust-embedded/cross
 
+      - name: Install OpenSSL for musl targets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -62,6 +67,7 @@ jobs:
         run: cross build --manifest-path commercial/Cargo.toml --release --all-features --target=${{ matrix.job.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+          OPENSSL_DIR: /usr
 
       - name: Exec chmod
         run: chmod -v a+x commercial/target/${{ matrix.job.target }}/release/*
