@@ -1,4 +1,5 @@
 use axum::{
+    body::Body,
     http::{Request, StatusCode},
     middleware::Next,
     response::Response,
@@ -8,7 +9,7 @@ use axum::{
 use crate::user::models::UserInfo;
 use crate::AppState;
 
-pub async fn auth_middleware<B>(req: Request<B>, next: Next<B>) -> Result<Response, StatusCode> {
+pub async fn auth_middleware(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let auth_header = req.headers().get("Authorization");
 
     // Get state from extensions
@@ -34,7 +35,7 @@ pub async fn auth_middleware<B>(req: Request<B>, next: Next<B>) -> Result<Respon
     }
 }
 
-pub async fn admin_middleware<B>(req: Request<B>, next: Next<B>) -> Result<Response, StatusCode> {
+pub async fn admin_middleware(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     // Check if user is admin
     let user = req
         .extensions()
@@ -48,10 +49,7 @@ pub async fn admin_middleware<B>(req: Request<B>, next: Next<B>) -> Result<Respo
     Ok(next.run(req).await)
 }
 
-pub async fn optional_auth_middleware<B>(
-    mut req: Request<B>,
-    next: Next<B>,
-) -> Result<Response, StatusCode> {
+pub async fn optional_auth_middleware(mut req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let auth_header = req.headers().get("Authorization");
 
     if let Some(header) = auth_header {

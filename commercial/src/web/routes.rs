@@ -1,5 +1,5 @@
 use axum::{
-    http::Method,
+    http::{HeaderValue, Method},
     response::IntoResponse,
     routing::{get, post, put},
     Extension, Router,
@@ -207,10 +207,38 @@ pub async fn prometheus_metrics(Extension(state): Extension<AppState>) -> impl I
 }
 
 pub async fn start_server(state: AppState, port: u16) -> anyhow::Result<()> {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        .allow_headers(Any);
+    // CORS 配置：支持环境变量配置允许的来源
+    // 用法: 设置 CORS_ALLOWED_ORIGINS 环境变量为逗号分隔的域名列表
+    // 例如: CORS_ALLOWED_ORIGINS=https://example.com,https://app.example.com
+    // 如果未设置或设置为 "*"，则允许所有来源（仅推荐用于开发环境）
+    let cors = {
+        let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
+            .unwrap_or_else(|_| "*".to_string());
+        
+        let cors_layer = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+            .allow_headers(Any);
+        
+        if allowed_origins.trim() == "*" {
+            // 生产环境不推荐：允许所有来源
+            log::warn!("CORS configured to allow all origins (not recommended for production)");
+            cors_layer.allow_origin(Any)
+        } else {
+            // 解析允许的来源列表
+            let origins: Vec<HeaderValue> = allowed_origins
+                .split(',')
+                .filter_map(|s| HeaderValue::from_str(s.trim()).ok())
+                .collect();
+            
+            if origins.is_empty() {
+                log::warn!("No valid CORS origins found, allowing all origins");
+                cors_layer.allow_origin(Any)
+            } else {
+                log::info!("CORS configured with {} allowed origins", origins.len());
+                cors_layer.allow_origin(origins)
+            }
+        }
+    };
 
     // Public routes (no authentication required)
     let public_routes = Router::new()
@@ -292,9 +320,8 @@ pub async fn start_server(state: AppState, port: u16) -> anyhow::Result<()> {
     log::info!("    POST /api/license/generate");
     log::info!("    POST /api/license/validate");
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

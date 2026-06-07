@@ -1,75 +1,81 @@
-use clap::{App, Arg, SubCommand};
+use clap::{Arg, Command};
 use flexi_logger::Logger;
 use log::info;
 
 use rustdesk_server_pro::AppState;
 
 fn main() -> anyhow::Result<()> {
-    let matches = App::new("rustdesk-pro")
+    let matches = Command::new("rustdesk-pro")
         .version("1.0.0")
         .about("RustDesk Server Commercial Edition")
         .arg(
-            Arg::with_name("log_level")
-                .short("l")
+            Arg::new("log_level")
+                .short('l')
                 .long("log-level")
-                .takes_value(true)
+                .value_name("LEVEL")
                 .default_value("info"),
         )
         .arg(
-            Arg::with_name("port")
-                .short("p")
+            Arg::new("port")
+                .short('p')
                 .long("port")
-                .takes_value(true)
+                .value_name("PORT")
                 .default_value("8080"),
         )
         .arg(
-            Arg::with_name("config")
-                .short("c")
+            Arg::new("config")
+                .short('c')
                 .long("config")
-                .takes_value(true),
+                .value_name("FILE"),
         )
         .subcommand(
-            SubCommand::with_name("generate-license")
+            Command::new("generate-license")
                 .about("Generate a license key")
                 .arg(
-                    Arg::with_name("type")
-                        .short("t")
+                    Arg::new("type")
+                        .short('t')
                         .long("type")
-                        .takes_value(true)
+                        .value_name("TYPE")
                         .required(true),
                 )
                 .arg(
-                    Arg::with_name("duration_days")
-                        .short("d")
+                    Arg::new("duration_days")
+                        .short('d')
                         .long("duration-days")
-                        .takes_value(true)
+                        .value_name("DAYS")
                         .required(true),
                 )
                 .arg(
-                    Arg::with_name("max_devices")
-                        .short("m")
+                    Arg::new("max_devices")
+                        .short('m')
                         .long("max-devices")
-                        .takes_value(true),
+                        .value_name("NUM"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("validate-license")
+            Command::new("validate-license")
                 .about("Validate a license key")
                 .arg(
-                    Arg::with_name("key")
-                        .short("k")
+                    Arg::new("key")
+                        .short('k')
                         .long("key")
-                        .takes_value(true)
+                        .value_name("KEY")
                         .required(true),
                 ),
         )
-        .subcommand(SubCommand::with_name("serve").about("Start the server"))
+        .subcommand(Command::new("serve").about("Start the server"))
         .get_matches();
 
-    let log_level = matches.value_of("log_level").unwrap_or("info");
-    let port = matches.value_of("port").unwrap_or("8080").parse()?;
+    let log_level = matches.get_one::<String>("log_level")
+        .cloned()
+        .unwrap_or_else(|| "info".to_string());
+    let port: u16 = matches.get_one::<String>("port")
+        .cloned()
+        .unwrap_or_else(|| "8080".to_string())
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Invalid port number: {}", e))?;
 
-    Logger::try_with_env_or_str(log_level)?
+    Logger::try_with_env_or_str(&log_level)?
         .log_to_stdout()
         .start()?;
 
@@ -77,11 +83,15 @@ fn main() -> anyhow::Result<()> {
 
     tokio::runtime::Runtime::new()?.block_on(async {
         match matches.subcommand() {
-            ("generate-license", Some(sub_m)) => {
-                let r#type = sub_m.value_of("type").unwrap();
-                let duration_days = sub_m.value_of("duration_days").unwrap().parse()?;
+            Some(("generate-license", sub_m)) => {
+                let r#type = sub_m.get_one::<String>("type")
+                    .ok_or_else(|| anyhow::anyhow!("type argument is required"))?;
+                let duration_days: i64 = sub_m.get_one::<String>("duration_days")
+                    .ok_or_else(|| anyhow::anyhow!("duration_days argument is required"))?
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid duration_days: {}", e))?;
                 let max_devices = sub_m
-                    .value_of("max_devices")
+                    .get_one::<String>("max_devices")
                     .map(|s| s.parse())
                     .transpose()?;
 
@@ -92,8 +102,9 @@ fn main() -> anyhow::Result<()> {
                     .await?;
                 println!("Generated license key: {}", key);
             }
-            ("validate-license", Some(sub_m)) => {
-                let key = sub_m.value_of("key").unwrap();
+            Some(("validate-license", sub_m)) => {
+                let key = sub_m.get_one::<String>("key")
+                    .ok_or_else(|| anyhow::anyhow!("key argument is required"))?;
 
                 let state = AppState::new().await;
                 match state.license_manager.validate_license(key).await {
@@ -106,10 +117,11 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
             }
-            ("serve", _) | (_, _) => {
+            Some(("serve", _)) | None => {
                 let state = AppState::new().await;
                 rustdesk_server_pro::web::start_server(state, port).await?;
             }
+            _ => {}
         }
         Ok(())
     })
