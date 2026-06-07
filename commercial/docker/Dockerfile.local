@@ -3,7 +3,7 @@
 # Build: podman build -t rustdesk-pro-server:local -f commercial/docker/Dockerfile.local .
 
 # ==================== Build Stage ====================
-FROM rust:1.88 as builder
+FROM rust:1.96 as builder
 
 WORKDIR /build
 

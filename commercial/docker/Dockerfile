@@ -6,7 +6,7 @@
 # ==================== Build Stage ====================
 # Use mirror for faster download in China
 # FROM registry.cn-hangzhou.aliyuncs.com/mirror_rust/rust:1.88 as builder
-FROM rust:1.88 as builder
+FROM rust:1.96 as builder
 
 WORKDIR /build
 

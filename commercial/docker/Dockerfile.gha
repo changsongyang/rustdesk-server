@@ -3,7 +3,7 @@
 # Build: docker build -t rustdesk-pro-server:gha -f commercial/docker/Dockerfile.gha .
 
 # ==================== Build Stage ====================
-FROM rust:1.88 as builder
+FROM rust:1.96 as builder
 
 WORKDIR /build
 
