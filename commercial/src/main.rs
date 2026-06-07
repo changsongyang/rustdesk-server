@@ -66,10 +66,12 @@ fn main() -> anyhow::Result<()> {
         .subcommand(Command::new("serve").about("Start the server"))
         .get_matches();
 
-    let log_level = matches.get_one::<String>("log_level")
+    let log_level = matches
+        .get_one::<String>("log_level")
         .cloned()
         .unwrap_or_else(|| "info".to_string());
-    let port: u16 = matches.get_one::<String>("port")
+    let port: u16 = matches
+        .get_one::<String>("port")
         .cloned()
         .unwrap_or_else(|| "8080".to_string())
         .parse()
@@ -84,9 +86,11 @@ fn main() -> anyhow::Result<()> {
     tokio::runtime::Runtime::new()?.block_on(async {
         match matches.subcommand() {
             Some(("generate-license", sub_m)) => {
-                let r#type = sub_m.get_one::<String>("type")
+                let r#type = sub_m
+                    .get_one::<String>("type")
                     .ok_or_else(|| anyhow::anyhow!("type argument is required"))?;
-                let duration_days: i64 = sub_m.get_one::<String>("duration_days")
+                let duration_days: i64 = sub_m
+                    .get_one::<String>("duration_days")
                     .ok_or_else(|| anyhow::anyhow!("duration_days argument is required"))?
                     .parse()
                     .map_err(|e| anyhow::anyhow!("Invalid duration_days: {}", e))?;
@@ -103,7 +107,8 @@ fn main() -> anyhow::Result<()> {
                 println!("Generated license key: {}", key);
             }
             Some(("validate-license", sub_m)) => {
-                let key = sub_m.get_one::<String>("key")
+                let key = sub_m
+                    .get_one::<String>("key")
                     .ok_or_else(|| anyhow::anyhow!("key argument is required"))?;
 
                 let state = AppState::new().await;

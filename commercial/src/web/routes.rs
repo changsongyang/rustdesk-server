@@ -212,13 +212,13 @@ pub async fn start_server(state: AppState, port: u16) -> anyhow::Result<()> {
     // 例如: CORS_ALLOWED_ORIGINS=https://example.com,https://app.example.com
     // 如果未设置或设置为 "*"，则允许所有来源（仅推荐用于开发环境）
     let cors = {
-        let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "*".to_string());
-        
+        let allowed_origins =
+            std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_else(|_| "*".to_string());
+
         let cors_layer = CorsLayer::new()
             .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
             .allow_headers(Any);
-        
+
         if allowed_origins.trim() == "*" {
             // 生产环境不推荐：允许所有来源
             log::warn!("CORS configured to allow all origins (not recommended for production)");
@@ -229,7 +229,7 @@ pub async fn start_server(state: AppState, port: u16) -> anyhow::Result<()> {
                 .split(',')
                 .filter_map(|s| HeaderValue::from_str(s.trim()).ok())
                 .collect();
-            
+
             if origins.is_empty() {
                 log::warn!("No valid CORS origins found, allowing all origins");
                 cors_layer.allow_origin(Any)

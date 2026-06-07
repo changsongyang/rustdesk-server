@@ -28,8 +28,8 @@ impl LicenseManager {
 
     /// 生成许可证签名
     fn sign_data(data: &[u8]) -> Vec<u8> {
-        let mut mac = HmacSha256::new_from_slice(LICENSE_SIGNING_KEY)
-            .expect("HMAC can take key of any size");
+        let mut mac =
+            HmacSha256::new_from_slice(LICENSE_SIGNING_KEY).expect("HMAC can take key of any size");
         mac.update(data);
         mac.finalize().into_bytes().to_vec()
     }

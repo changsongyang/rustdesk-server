@@ -49,7 +49,10 @@ pub async fn admin_middleware(req: Request<Body>, next: Next) -> Result<Response
     Ok(next.run(req).await)
 }
 
-pub async fn optional_auth_middleware(mut req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
+pub async fn optional_auth_middleware(
+    mut req: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
     let auth_header = req.headers().get("Authorization");
 
     if let Some(header) = auth_header {
