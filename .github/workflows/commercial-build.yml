@@ -50,13 +50,16 @@ jobs:
           toolchain: "1.96"
           targets: ${{ matrix.job.target }}
 
+      - name: Install cross tool
+        run: cargo install cross --git https://github.com/rust-embedded/cross
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.job.target }}
 
       - name: Build
-        run: cargo build --manifest-path commercial/Cargo.toml --release --all-features --target=${{ matrix.job.target }}
+        run: cross build --manifest-path commercial/Cargo.toml --release --all-features --target=${{ matrix.job.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
