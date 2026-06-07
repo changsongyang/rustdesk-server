@@ -1,0 +1,1354 @@
+   Compiling chrono v0.4.45
+   Compiling flexi_logger v0.27.4
+   Compiling sqlx-core v0.6.3
+   Compiling hbb_common v0.1.0 (C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\libs\hbb_common)
+warning: unused return value of `std::array::<impl [T; N]>::map` that must be used
+    --> C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\libs\hbb_common\src\config.rs:1479:9
+     |
+1479 | /         [
+1480 | |             keys::OPTION_CODEC_PREFERENCE,
+1481 | |             keys::OPTION_CUSTOM_FPS,
+1482 | |             keys::OPTION_ZOOM_CURSOR,
+...    |
+1489 | |             mp.insert(key.to_owned(), UserDefaultConfig::read(key));
+1490 | |         });
+     | |__________^
+     |
+     = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+     |
+1479 |         let _ = [
+     |         +++++++
+
+   Compiling sqlx v0.6.3
+   Compiling rustdesk-server-pro v1.0.0 (C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial)
+error[E0583]: file not found for module `utils`
+ --> src\lib.rs:6:1
+  |
+6 | pub mod utils;
+  | ^^^^^^^^^^^^^^
+  |
+  = help: to create the module `utils`, create file "src\utils.rs" or "src\utils\mod.rs"
+  = note: if there is a `mod utils` elsewhere in the crate already, import it with `use crate::...` instead
+
+error: error returned from database: (code: 14) unable to open database file
+  --> src\user\manager.rs:50:17
+   |
+50 |           let _ = sqlx::query!(
+   |  _________________^
+51 | |             "
+52 | |             CREATE TABLE IF NOT EXISTS users (
+53 | |                 id TEXT PRIMARY KEY NOT NULL,
+...  |
+66 | |             "
+67 | |         )
+   | |_________^
+   |
+   = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+  --> src\user\manager.rs:80:24
+   |
+80 |           let existing = sqlx::query!(
+   |  ________________________^
+81 | |             "SELECT id FROM users WHERE username = ? OR email = ?",
+82 | |             request.username,
+83 | |             request.email
+84 | |         )
+   | |_________^
+   |
+   = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+  --> src\user\manager.rs:89:33
+   |
+89 |               let existing_user = sqlx::query!(
+   |  _________________________________^
+90 | |                 "SELECT username, email FROM users WHERE username = ? OR email = ?",
+91 | |                 request.username,
+92 | |                 request.email
+93 | |             )
+   | |_____________^
+   |
+   = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:107:9
+    |
+107 | /         sqlx::query!(
+108 | |             "INSERT INTO users (id, username, email, password_hash, role, organization_id, created_at, is_active)
+109 | |              VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+110 | |             id,
+...   |
+116 | |             created_at.to_rfc3339()
+117 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:126:19
+    |
+126 |   ...   let row = sqlx::query_as!(
+    |  _________________^
+127 | | ...       UserRow,
+128 | | ...       "SELECT id, username, email, password_hash, role, organization_id, created_at, last_login, is_active FROM users WHERE i...
+129 | | ...       id
+130 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:139:19
+    |
+139 |   ...   let row = sqlx::query_as!(
+    |  _________________^
+140 | | ...       UserRow,
+141 | | ...       "SELECT id, username, email, password_hash, role, organization_id, created_at, last_login, is_active FROM users WHERE u...
+142 | | ...       username
+143 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:201:22
+    |
+201 |         let result = sqlx::query!("DELETE FROM users WHERE id = ?", id)
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:214:13
+    |
+214 | / ...   sqlx::query_as!(
+215 | | ...       UserRow,
+216 | | ...       "SELECT id, username, email, password_hash, role, organization_id, created_at, last_login, is_active FROM users WHERE o...
+217 | | ...       org_id
+218 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:222:13
+    |
+222 | /             sqlx::query_as!(
+223 | |                 UserRow,
+224 | |                 "SELECT id, username, email, password_hash, role, organization_id, created_at, last_login, is_active FROM users"
+225 | |             )
+    | |_____________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\user\manager.rs:272:9
+    |
+272 | /         sqlx::query!(
+273 | |             "UPDATE users SET last_login = ? WHERE id = ?",
+274 | |             Utc::now().to_rfc3339(),
+275 | |             user_id
+276 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+  --> src\device\manager.rs:79:24
+   |
+79 |           let existing = sqlx::query_as!(
+   |  ________________________^
+80 | |             DeviceRow,
+81 | |             "SELECT * FROM devices WHERE device_id = ?",
+82 | |             request.device_id
+83 | |         )
+   | |_________^
+   |
+   = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:123:19
+    |
+123 |           let row = sqlx::query_as!(
+    |  ___________________^
+124 | |             DeviceRow,
+125 | |             "SELECT * FROM devices WHERE id = ?",
+126 | |             id
+127 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:136:19
+    |
+136 |           let row = sqlx::query_as!(
+    |  ___________________^
+137 | |             DeviceRow,
+138 | |             "SELECT * FROM devices WHERE device_id = ?",
+139 | |             device_id
+140 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:239:22
+    |
+239 |           let result = sqlx::query!(
+    |  ______________________^
+240 | |             "DELETE FROM devices WHERE id = ?",
+241 | |             id
+242 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:262:21
+    |
+262 | /                     sqlx::query_as!(
+263 | |                         DeviceRow,
+264 | |                         "SELECT * FROM devices WHERE organization_id = ? AND status = ? AND approved = ?",
+265 | |                         org_id,
+266 | |                         s.to_string().to_lowercase(),
+267 | |                         a
+268 | |                     )
+    | |_____________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:272:21
+    |
+272 | /                     sqlx::query_as!(
+273 | |                         DeviceRow,
+274 | |                         "SELECT * FROM devices WHERE organization_id = ? AND status = ?",
+275 | |                         org_id,
+276 | |                         s.to_string().to_lowercase()
+277 | |                     )
+    | |_____________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:282:17
+    |
+282 | /                 sqlx::query_as!(
+283 | |                     DeviceRow,
+284 | |                     "SELECT * FROM devices WHERE organization_id = ? AND approved = ?",
+285 | |                     org_id,
+286 | |                     a
+287 | |                 )
+    | |_________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:291:17
+    |
+291 | /                 sqlx::query_as!(
+292 | |                     DeviceRow,
+293 | |                     "SELECT * FROM devices WHERE organization_id = ?",
+294 | |                     org_id
+295 | |                 )
+    | |_________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:301:17
+    |
+301 | /                 sqlx::query_as!(
+302 | |                     DeviceRow,
+303 | |                     "SELECT * FROM devices WHERE status = ? AND approved = ?",
+304 | |                     s.to_string().to_lowercase(),
+305 | |                     a
+306 | |                 )
+    | |_________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:310:17
+    |
+310 | /                 sqlx::query_as!(
+311 | |                     DeviceRow,
+312 | |                     "SELECT * FROM devices WHERE status = ?",
+313 | |                     s.to_string().to_lowercase()
+314 | |                 )
+    | |_________________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:319:13
+    |
+319 | /             sqlx::query_as!(
+320 | |                 DeviceRow,
+321 | |                 "SELECT * FROM devices WHERE approved = ?",
+322 | |                 a
+323 | |             )
+    | |_____________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\device\manager.rs:327:13
+    |
+327 | /             sqlx::query_as!(
+328 | |                 DeviceRow,
+329 | |                 "SELECT * FROM devices"
+330 | |             )
+    | |_____________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: error returned from database: (code: 14) unable to open database file
+   --> src\audit\logger.rs:101:19
+    |
+101 |           let row = sqlx::query_as!(
+    |  ___________________^
+102 | |             AuditLogRow,
+103 | |             "SELECT * FROM audit_logs WHERE id = ?",
+104 | |             id
+105 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0432]: unresolved import `axum::extract::State`
+ --> src\web\handlers.rs:2:27
+  |
+2 |     extract::{Json, Path, State},
+  |                           ^^^^^ no `State` in `extract`
+
+error[E0432]: unresolved import `crate::license::LicenseType`
+  --> src\web\handlers.rs:11:28
+   |
+11 |     license::{LicenseInfo, LicenseType},
+   |                            ^^^^^^^^^^^ no `LicenseType` in `license`
+   |
+   = help: consider importing this enum instead:
+           crate::license::models::LicenseType
+
+error[E0423]: cannot initialize a tuple struct which contains private fields
+   --> src\license\manager.rs:134:25
+    |
+134 |         let signature = sign::Signature(sig_arr);
+    |                         ^^^^^^^^^^^^^^^
+    |
+note: constructor is not visible here due to private fields
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ed25519-1.5.3\src\lib.rs:284:22
+    |
+284 | pub struct Signature([u8; Signature::BYTE_SIZE]);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+help: you might have meant to use the `new` associated function
+    |
+134 |         let signature = sign::Signature::new(sig_arr);
+    |                                        +++++
+
+warning: unused import: `DateTime`
+ --> src\license\manager.rs:1:14
+  |
+1 | use chrono::{DateTime, Duration, Utc};
+  |              ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `uuid::Uuid`
+ --> src\license\models.rs:3:5
+  |
+3 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\user\manager.rs:5:5
+  |
+5 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+ --> src\user\models.rs:3:5
+  |
+3 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\device\manager.rs:3:5
+  |
+3 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+ --> src\device\models.rs:3:5
+  |
+3 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\audit\logger.rs:3:5
+  |
+3 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+ --> src\audit\models.rs:3:5
+  |
+3 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused imports: `delete` and `put`
+ --> src\web\routes.rs:3:26
+  |
+3 |     routing::{get, post, put, delete},
+  |                          ^^^  ^^^^^^
+
+warning: unused import: `AuditError`
+  --> src\web\handlers.rs:14:24
+   |
+14 |     audit::{models::*, AuditError},
+   |                        ^^^^^^^^^^
+
+error[E0609]: no field `0` on type `Vec<u8>`
+   --> src\license\manager.rs:110:50
+    |
+110 |         license_key.extend_from_slice(&signature.0);
+    |                                                  ^ unknown field
+
+error[E0433]: cannot find module or crate `base64` in this scope
+   --> src\license\manager.rs:113:12
+    |
+113 |         Ok(base64::encode(&license_key))
+    |            ^^^^^^ use of unresolved module or unlinked crate `base64`
+    |
+    = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0433]: cannot find module or crate `base64` in this scope
+   --> src\license\manager.rs:117:23
+    |
+117 |         let decoded = base64::decode(key)
+    |                       ^^^^^^ use of unresolved module or unlinked crate `base64`
+    |
+    = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0225]: only auto traits can be used as additional traits in a trait object
+   --> src\user\manager.rs:153:68
+    |
+153 |         let mut params: Vec<&(dyn sqlx::Encode<'_, sqlx::Sqlite> + sqlx::Type<sqlx::Sqlite>)> = Vec::new();
+    |                                   ------------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^ additional non-auto trait
+    |                                   |
+    |                                   first non-auto trait
+    |
+    = help: consider creating a new trait with all of these as supertraits and using that trait here instead: `trait NewTrait: Encode<'_, Sqlite> + sqlx::Type<Sqlite> {}`
+    = note: auto-traits like `Send` and `Sync` are traits that have special properties; for more information on them, visit <https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits>
+
+error[E0308]: `?` operator has incompatible types
+   --> src\user\manager.rs:260:30
+    |
+260 |         let claims: Claims = decode(&token, &decoding_key, &validation)?;
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Claims`, found `TokenData<_>`
+    |
+    = note: `?` operator cannot convert from `TokenData<_>` to `Claims`
+    = note: expected struct `Claims`
+               found struct `TokenData<_>`
+
+error[E0225]: only auto traits can be used as additional traits in a trait object
+   --> src\device\manager.rs:156:68
+    |
+156 |         let mut params: Vec<&(dyn sqlx::Encode<'_, sqlx::Sqlite> + sqlx::Type<sqlx::Sqlite>)> = Vec::new();
+    |                                   ------------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^ additional non-auto trait
+    |                                   |
+    |                                   first non-auto trait
+    |
+    = help: consider creating a new trait with all of these as supertraits and using that trait here instead: `trait NewTrait: Encode<'_, Sqlite> + sqlx::Type<Sqlite> {}`
+    = note: auto-traits like `Send` and `Sync` are traits that have special properties; for more information on them, visit <https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits>
+
+error[E0599]: the method `to_string` exists for reference `&device::models::DeviceStatus`, but its trait bounds were not satisfied
+    --> src\device\manager.rs:185:33
+     |
+ 185 |             params.push(&status.to_string().to_lowercase());
+     |                                 ^^^^^^^^^ method cannot be called on `&device::models::DeviceStatus` due to unsatisfied trait bounds
+     |
+    ::: src\device\models.rs:27:1
+     |
+  27 | pub enum DeviceStatus {
+     | --------------------- doesn't satisfy `device::models::DeviceStatus: ToString` or `device::models::DeviceStatus: std::fmt::Display`
+     |
+     = note: the following trait bounds were not satisfied:
+             `device::models::DeviceStatus: std::fmt::Display`
+             which is required by `device::models::DeviceStatus: ToString`
+             `&device::models::DeviceStatus: std::fmt::Display`
+             which is required by `&device::models::DeviceStatus: ToString`
+note: the trait `std::fmt::Display` must be implemented
+    --> C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\fmt\mod.rs:1187:1
+     |
+1187 | pub trait Display: PointeeSized {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+             candidate #1: `ToString`
+
+error[E0599]: `audit::models::AuditLogType` doesn't implement `std::fmt::Display`
+    --> src\audit\logger.rs:84:33
+     |
+  84 |         .bind(&request.log_type.to_string().to_lowercase())
+     |                                 ^^^^^^^^^ method cannot be called on `audit::models::AuditLogType` due to unsatisfied trait bounds
+     |
+    ::: src\audit\models.rs:22:1
+     |
+  22 | pub enum AuditLogType {
+     | --------------------- method `to_string` not found for this enum because it doesn't satisfy `audit::models::AuditLogType: ToString` or `audit::models::AuditLogType: std::fmt::Display`
+     |
+     = note: the following trait bounds were not satisfied:
+             `audit::models::AuditLogType: std::fmt::Display`
+             which is required by `audit::models::AuditLogType: ToString`
+note: the trait `std::fmt::Display` must be implemented
+    --> C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\fmt\mod.rs:1187:1
+     |
+1187 | pub trait Display: PointeeSized {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+             candidate #1: `ToString`
+
+error[E0225]: only auto traits can be used as additional traits in a trait object
+   --> src\audit\logger.rs:124:68
+    |
+124 |         let mut params: Vec<&(dyn sqlx::Encode<'_, sqlx::Sqlite> + sqlx::Type<sqlx::Sqlite>)> = Vec::new();
+    |                                   ------------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^ additional non-auto trait
+    |                                   |
+    |                                   first non-auto trait
+    |
+    = help: consider creating a new trait with all of these as supertraits and using that trait here instead: `trait NewTrait: Encode<'_, Sqlite> + sqlx::Type<Sqlite> {}`
+    = note: auto-traits like `Send` and `Sync` are traits that have special properties; for more information on them, visit <https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits>
+
+error[E0599]: the method `to_string` exists for reference `&audit::models::AuditLogType`, but its trait bounds were not satisfied
+    --> src\audit\logger.rs:128:34
+     |
+ 128 |             let log_type_str = t.to_string().to_lowercase();
+     |                                  ^^^^^^^^^ method cannot be called on `&audit::models::AuditLogType` due to unsatisfied trait bounds
+     |
+    ::: src\audit\models.rs:22:1
+     |
+  22 | pub enum AuditLogType {
+     | --------------------- doesn't satisfy `audit::models::AuditLogType: ToString` or `audit::models::AuditLogType: std::fmt::Display`
+     |
+     = note: the following trait bounds were not satisfied:
+             `audit::models::AuditLogType: std::fmt::Display`
+             which is required by `audit::models::AuditLogType: ToString`
+             `&audit::models::AuditLogType: std::fmt::Display`
+             which is required by `&audit::models::AuditLogType: ToString`
+note: the trait `std::fmt::Display` must be implemented
+    --> C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\fmt\mod.rs:1187:1
+     |
+1187 | pub trait Display: PointeeSized {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+             candidate #1: `ToString`
+
+error[E0308]: mismatched types
+   --> src\audit\logger.rs:221:27
+    |
+221 |             details: Some(details),
+    |                      ---- ^^^^^^^ expected `Value`, found `Option<Value>`
+    |                      |
+    |                      arguments to this enum variant are incorrect
+    |
+    = note: expected enum `JsonValue`
+               found enum `std::option::Option<JsonValue>`
+help: the type constructed contains `std::option::Option<JsonValue>` due to the type of the argument passed
+   --> src\audit\logger.rs:221:22
+    |
+221 |             details: Some(details),
+    |                      ^^^^^-------^
+    |                           |
+    |                           this argument influences the type of `Some`
+note: tuple variant defined here
+   --> C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\option.rs:608:5
+    |
+608 |     Some(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^^^
+help: consider using `Option::expect` to unwrap the `std::option::Option<JsonValue>` value, panicking if the value is an `Option::None`
+    |
+221 |             details: Some(details.expect("REASON")),
+    |                                  +++++++++++++++++
+
+error[E0308]: mismatched types
+   --> src\audit\logger.rs:269:27
+    |
+269 |             details: Some(details),
+    |                      ---- ^^^^^^^ expected `Value`, found `Option<Value>`
+    |                      |
+    |                      arguments to this enum variant are incorrect
+    |
+    = note: expected enum `JsonValue`
+               found enum `std::option::Option<JsonValue>`
+help: the type constructed contains `std::option::Option<JsonValue>` due to the type of the argument passed
+   --> src\audit\logger.rs:269:22
+    |
+269 |             details: Some(details),
+    |                      ^^^^^-------^
+    |                           |
+    |                           this argument influences the type of `Some`
+note: tuple variant defined here
+   --> C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\option.rs:608:5
+    |
+608 |     Some(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ^^^^
+help: consider using `Option::expect` to unwrap the `std::option::Option<JsonValue>` value, panicking if the value is an `Option::None`
+    |
+269 |             details: Some(details.expect("REASON")),
+    |                                  +++++++++++++++++
+
+error[E0277]: the trait bound `fn({type error}, Json<UserLoginRequest>) -> ... {login}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:22:40
+    |
+ 22 |         .route("/api/auth/login", post(login))
+    |                                   ---- ^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Json<UserLoginRequest>) -> ... {login}`
+    |                                   |
+    |                                   required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-1232016243343600885.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Json<...>) -> ... {create_user}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:23:35
+    |
+ 23 |         .route("/api/users", post(create_user).get(list_users))
+    |                              ---- ^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Json<UserCreateRequest>) -> ... {create_user}`
+    |                              |
+    |                              required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-12958463948275694918.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}) -> ... {list_users}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:23:52
+    |
+ 23 |         .route("/api/users", post(create_user).get(list_users))
+    |                                                --- ^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}) -> impl Future<Output = ...> {list_users}`
+    |                                                |
+    |                                                required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::get`
+...
+600 |     chained_handler_fn!(get, GET);
+    |     -----------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-11816256692552203598.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {get_user}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:24:43
+    |
+ 24 |         .route("/api/users/:user_id", get(get_user).put(update_user).delete(delete_user))
+    |                                       --- ^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> impl Future<Output = ...> {get_user}`
+    |                                       |
+    |                                       required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `axum::routing::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `get`
+...
+397 | top_level_handler_fn!(get, GET);
+    | -------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-10420926057400929737.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<...>, ...) -> ... {update_user}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:24:57
+    |
+ 24 |         .route("/api/users/:user_id", get(get_user).put(update_user).delete(delete_user))
+    |                                                     --- ^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>, Json<...>) -> ... {update_user}`
+    |                                                     |
+    |                                                     required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::put`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::put`
+...
+605 |     chained_handler_fn!(put, PUT);
+    |     -----------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-17370033447108002929.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {delete_user}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:24:77
+    |
+ 24 |         .route("/api/users/:user_id", get(get_user).put(update_user).delete(delete_user))
+    |                                                                      ------ ^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> ... {delete_user}`
+    |                                                                      |
+    |                                                                      required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::delete`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::delete`
+...
+599 |     chained_handler_fn!(delete, DELETE);
+    |     -----------------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-12714703414198002812.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Json<...>) -> ... {generate_license}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:25:46
+    |
+ 25 |         .route("/api/license/generate", post(generate_license))
+    |                                         ---- ^^^^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Json<...>) -> ... {generate_license}`
+    |                                         |
+    |                                         required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-12269666917193605793.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Json<...>) -> ... {validate_license}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:26:46
+    |
+ 26 |         .route("/api/license/validate", post(validate_license))
+    |                                         ---- ^^^^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Json<...>) -> ... {validate_license}`
+    |                                         |
+    |                                         required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-10546470242892410304.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}) -> ... {get_active_license}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:27:36
+    |
+ 27 |         .route("/api/license", get(get_active_license))
+    |                                --- ^^^^^^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}) -> impl Future<Output = ...> {get_active_license}`
+    |                                |
+    |                                required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `axum::routing::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `get`
+...
+397 | top_level_handler_fn!(get, GET);
+    | -------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-8607430221844450872.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Json<...>) -> ... {create_device}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:28:37
+    |
+ 28 |         .route("/api/devices", post(create_device).get(list_devices))
+    |                                ---- ^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Json<DeviceCreateRequest>) -> ... {create_device}`
+    |                                |
+    |                                required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-11029055661720467503.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}) -> ... {list_devices}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:28:56
+    |
+ 28 |         .route("/api/devices", post(create_device).get(list_devices))
+    |                                                    --- ^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}) -> impl Future<Output = ...> {list_devices}`
+    |                                                    |
+    |                                                    required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::get`
+...
+600 |     chained_handler_fn!(get, GET);
+    |     -----------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-4077446547782803698.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {get_device}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:29:47
+    |
+ 29 |         .route("/api/devices/:device_id", get(get_device).put(update_device).delete(delete_device))
+    |                                           --- ^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> ... {get_device}`
+    |                                           |
+    |                                           required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `axum::routing::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `get`
+...
+397 | top_level_handler_fn!(get, GET);
+    | -------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-7195967398948549388.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<...>, ...) -> ... {update_device}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:29:63
+    |
+ 29 |         .route("/api/devices/:device_id", get(get_device).put(update_device).delete(delete_device))
+    |                                                           --- ^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>, Json<...>) -> ... {update_device}`
+    |                                                           |
+    |                                                           required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::put`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::put`
+...
+605 |     chained_handler_fn!(put, PUT);
+    |     -----------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-15062443579542660391.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {delete_device}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:29:85
+    |
+ 29 |         .route("/api/devices/:device_id", get(get_device).put(update_device).delete(delete_device))
+    |                                                                              ------ ^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> ... {delete_device}`
+    |                                                                              |
+    |                                                                              required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `MethodRouter::<B>::delete`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:278:16
+    |
+278 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `MethodRouter::<B>::delete`
+...
+599 |     chained_handler_fn!(delete, DELETE);
+    |     -----------------------------------
+    |     |                   |
+    |     |                   required by a bound in this associated function
+    |     in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-829419913409383900.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `chained_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {approve_device}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:30:56
+    |
+ 30 |         .route("/api/devices/:device_id/approve", post(approve_device))
+    |                                                   ---- ^^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> ... {approve_device}`
+    |                                                   |
+    |                                                   required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `post`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `post`
+...
+401 | top_level_handler_fn!(post, POST);
+    | ---------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-11435845682383464939.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}) -> ... {list_audit_logs}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:31:39
+    |
+ 31 |         .route("/api/audit/logs", get(list_audit_logs))
+    |                                   --- ^^^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}) -> impl Future<Output = ...> {list_audit_logs}`
+    |                                   |
+    |                                   required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `axum::routing::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `get`
+...
+397 | top_level_handler_fn!(get, GET);
+    | -------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-9207148712329897996.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `fn({type error}, Path<String>) -> ... {get_audit_log}: Handler<_, _>` is not satisfied
+   --> src\web\routes.rs:32:47
+    |
+ 32 |         .route("/api/audit/logs/:log_id", get(get_audit_log))
+    |                                           --- ^^^^^^^^^^^^^ the trait `Handler<_, _>` is not implemented for fn item `fn({type error}, Path<String>) -> ... {get_audit_log}`
+    |                                           |
+    |                                           required by a bound introduced by this call
+    |
+help: the trait `Handler<T, ReqBody>` is implemented for `Layered<S, T>`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\handler\mod.rs:287:1
+    |
+287 | / impl<S, T, ReqBody, ResBody> Handler<T, ReqBody> for Layered<S, T>
+288 | | where
+289 | |     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+290 | |     S::Error: IntoResponse,
+...   |
+294 | |     ResBody: HttpBody<Data = Bytes> + Send + 'static,
+295 | |     ResBody::Error: Into<BoxError>,
+    | |___________________________________^
+note: required by a bound in `axum::routing::get`
+   --> C:\Users\ycsit\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\axum-0.5.17\src\routing\method_routing.rs:141:16
+    |
+141 |             H: Handler<T, B>,
+    |                ^^^^^^^^^^^^^ required by this bound in `get`
+...
+397 | top_level_handler_fn!(get, GET);
+    | -------------------------------
+    | |                     |
+    | |                     required by a bound in this function
+    | in this macro invocation
+    = note: the full name for the type has been written to 'C:\Users\ycsit\Downloads\rustdesk\rustdesk-server\commercial\target\debug\deps\rustdesk_server_pro-48392e2bb89301cb.long-type-8033310855980411046.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `top_level_handler_fn` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `with_state` found for struct `Router<B>` in the current scope
+  --> src\web\routes.rs:34:10
+   |
+20 |       let app = Router::new()
+   |  _______________-
+21 | |         .route("/health", get(health_check))
+22 | |         .route("/api/auth/login", post(login))
+23 | |         .route("/api/users", post(create_user).get(list_users))
+...  |
+33 | |         .layer(cors)
+34 | |         .with_state(state);
+   | |         -^^^^^^^^^^ method not found in `Router<_>`
+   | |_________|
+   |
+
+error[E0599]: no method named `read_to_string` found for struct `std::fs::File` in the current scope
+   --> src\license\manager.rs:34:21
+    |
+ 34 |             if file.read_to_string(&mut contents).is_ok() {
+    |                     ^^^^^^^^^^^^^^
+    |
+   ::: C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\io\mod.rs:973:8
+    |
+973 |     fn read_to_string(&mut self, buf: &mut String) -> Result<usize> {
+    |        -------------- the method is available for `std::fs::File` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `get_string` with a similar name, but with different arguments
+   --> C:\Users\ycsit\.cargo\git\checkouts\confy-d8e97c4de308af95\83db9ec\src\utils.rs:7:5
+    |
+  7 |     fn get_string(&mut self) -> Result<String, IoError>;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `Read` which provides `read_to_string` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use std::io::Read;
+    |
+
+error[E0433]: cannot find module or crate `base64` in this scope
+  --> src\license\manager.rs:35:39
+   |
+35 |                 if let Ok(sk_bytes) = base64::decode(contents.trim()) {
+   |                                       ^^^^^^ use of unresolved module or unlinked crate `base64`
+   |
+   = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0599]: no method named `read_to_string` found for struct `std::fs::File` in the current scope
+   --> src\license\manager.rs:49:21
+    |
+ 49 |             if file.read_to_string(&mut contents).is_ok() {
+    |                     ^^^^^^^^^^^^^^
+    |
+   ::: C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\io\mod.rs:973:8
+    |
+973 |     fn read_to_string(&mut self, buf: &mut String) -> Result<usize> {
+    |        -------------- the method is available for `std::fs::File` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `get_string` with a similar name, but with different arguments
+   --> C:\Users\ycsit\.cargo\git\checkouts\confy-d8e97c4de308af95\83db9ec\src\utils.rs:7:5
+    |
+  7 |     fn get_string(&mut self) -> Result<String, IoError>;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `Read` which provides `read_to_string` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use std::io::Read;
+    |
+
+error[E0433]: cannot find module or crate `base64` in this scope
+  --> src\license\manager.rs:50:39
+   |
+50 |                 if let Ok(pk_bytes) = base64::decode(contents.trim()) {
+   |                                       ^^^^^^ use of unresolved module or unlinked crate `base64`
+   |
+   = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0599]: no method named `write_all` found for struct `std::fs::File` in the current scope
+    --> src\license\manager.rs:67:26
+     |
+  67 |             let _ = file.write_all(&base64::encode(&sk.0).as_bytes());
+     |                          ^^^^^^^^^
+     |
+    ::: C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\io\mod.rs:1857:8
+     |
+1857 |     fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
+     |        --------- the method is available for `std::fs::File` here
+     |
+     = help: items from traits can only be used if the trait is in scope
+help: trait `Write` which provides `write_all` is implemented but not in scope; perhaps you want to import it
+     |
+   1 + use std::io::Write;
+     |
+help: there is a method `write` with a similar name
+     |
+  67 -             let _ = file.write_all(&base64::encode(&sk.0).as_bytes());
+  67 +             let _ = file.write(&base64::encode(&sk.0).as_bytes());
+     |
+
+error[E0433]: cannot find module or crate `base64` in this scope
+  --> src\license\manager.rs:67:37
+   |
+67 |             let _ = file.write_all(&base64::encode(&sk.0).as_bytes());
+   |                                     ^^^^^^ use of unresolved module or unlinked crate `base64`
+   |
+   = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0599]: no method named `write_all` found for struct `std::fs::File` in the current scope
+    --> src\license\manager.rs:71:26
+     |
+  71 |             let _ = file.write_all(&base64::encode(&pk.0).as_bytes());
+     |                          ^^^^^^^^^
+     |
+    ::: C:\Users\ycsit\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\io\mod.rs:1857:8
+     |
+1857 |     fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
+     |        --------- the method is available for `std::fs::File` here
+     |
+     = help: items from traits can only be used if the trait is in scope
+help: trait `Write` which provides `write_all` is implemented but not in scope; perhaps you want to import it
+     |
+   1 + use std::io::Write;
+     |
+help: there is a method `write` with a similar name
+     |
+  71 -             let _ = file.write_all(&base64::encode(&pk.0).as_bytes());
+  71 +             let _ = file.write(&base64::encode(&pk.0).as_bytes());
+     |
+
+error[E0433]: cannot find module or crate `base64` in this scope
+  --> src\license\manager.rs:71:37
+   |
+71 |             let _ = file.write_all(&base64::encode(&pk.0).as_bytes());
+   |                                     ^^^^^^ use of unresolved module or unlinked crate `base64`
+   |
+   = help: if you wanted to use a crate named `base64`, use `cargo add base64` to add it to your `Cargo.toml`
+
+error[E0277]: the trait bound `Atomic<i32>: Clone` is not satisfied
+  --> src\license\models.rs:65:5
+   |
+62 | #[derive(Debug, Clone)]
+   |                 ----- in this derive macro expansion
+...
+65 |     pub device_count: std::sync::atomic::AtomicI32,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `Atomic<i32>`
+
+error[E0277]: can't compare `bool` with `{integer}`
+   --> src\user\manager.rs:308:38
+    |
+308 |             is_active: row.is_active != 0,
+    |                                      ^^ no implementation for `bool == {integer}`
+    |
+    = help: the trait `PartialEq<{integer}>` is not implemented for `bool`
+    = help: `bool` implements trait `PartialEq<Rhs>`:
+              PartialEq<JsonValue>
+              PartialEq<windows::Win32::Foundation::BOOL>
+              PartialEq<windows::Win32::Foundation::BOOLEAN>
+              PartialEq<windows::Win32::Foundation::VARIANT_BOOL>
+              PartialEq
+
+error[E0308]: mismatched types
+   --> src\user\manager.rs:308:41
+    |
+308 |             is_active: row.is_active != 0,
+    |                                         ^ expected `bool`, found integer
+
+Some errors have detailed explanations: E0225, E0277, E0308, E0423, E0432, E0433, E0583, E0599, E0609.
+For more information about an error, try `rustc --explain E0225`.
+warning: `rustdesk-server-pro` (lib) generated 10 warnings
+error: could not compile `rustdesk-server-pro` (lib) due to 68 previous errors; 10 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `hbb_common` (lib) generated 1 warning

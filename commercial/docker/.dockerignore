@@ -1,0 +1,62 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock file (optional, uncomment if needed)
+# Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+
+# Test files
+tests/
+**/*_test.rs
+**/*_tests.rs
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Data directories
+data/
+logs/
+keys/
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS files
+.Dockerfile
+.dockerignore
+docker-compose*.yml
+*.log
+
+# Build scripts
+scripts/
+
+# Trae specs
+.trae/

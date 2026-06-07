@@ -1,0 +1,26 @@
+# RustDesk Pro Server - Windows Dockerfile
+# Uses pre-built Windows binary
+# Build: podman build -t rustdesk-pro-server:windows -f Dockerfile.windows ..
+
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+WORKDIR C:\app
+
+# Copy the pre-built binary
+COPY target/release/rustdesk-pro.exe .
+
+# Create necessary directories
+RUN mkdir data logs keys
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV SERVER_PORT=8080 \
+    SERVER_HOST=0.0.0.0 \
+    DATABASE_URL=sqlite:./data/rustdesk_pro.db \
+    PRO_DB_URL=./data/rustdesk_pro.db \
+    LOG_LEVEL=info
+
+# Run the application
+CMD ["rustdesk-pro.exe", "serve"]

@@ -1,0 +1,67 @@
+version: '3.8'
+# Docker Compose 配置 - GitHub Actions 版本
+# 适用于 CI/CD 环境，使用官方源
+# 使用: cd commercial/docker && docker-compose -f docker-compose.gha.yml up -d
+
+services:
+  # RustDesk Pro Server
+  rustdesk-pro:
+    build:
+      context: ../..
+      dockerfile: commercial/docker/Dockerfile.gha
+    image: rustdesk-pro-server:gha
+    container_name: rustdesk-pro-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - rustdesk-data:/app/data
+      - rustdesk-logs:/app/logs
+      - rustdesk-keys:/app/keys
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - DATABASE_URL=sqlite:./data/rustdesk_pro.db
+      - PRO_DB_URL=./data/rustdesk_pro.db
+      - JWT_SECRET=${JWT_SECRET:-rustdesk-pro-jwt-secret-key-change-in-production}
+      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@rustdesk.local}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - rustdesk-network
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: rustdesk-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - rustdesk-pro
+    networks:
+      - rustdesk-network
+
+volumes:
+  rustdesk-data:
+    driver: local
+  rustdesk-logs:
+    driver: local
+  rustdesk-keys:
+    driver: local
+
+networks:
+  rustdesk-network:
+    driver: bridge

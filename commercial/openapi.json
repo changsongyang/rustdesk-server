@@ -1,0 +1,764 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "RustDesk Pro Server API",
+    "description": "RustDesk Pro Server 企业版远程控制解决方案的 RESTful API 文档",
+    "version": "1.0.0",
+    "contact": {
+      "name": "RustDesk Team",
+      "email": "info@rustdesk.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "开发服务器"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "健康检查",
+        "description": "检查服务是否正常运行",
+        "tags": ["系统"],
+        "responses": {
+          "200": {
+            "description": "服务正常运行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ok"},
+                    "version": {"type": "string", "example": "1.0.0"},
+                    "service": {"type": "string", "example": "rustdesk-pro-server"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "用户登录",
+        "description": "使用用户名和密码登录系统，返回 JWT 访问令牌",
+        "tags": ["认证"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {"type": "string", "example": "admin"},
+                  "password": {"type": "string", "example": "admin123"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {"type": "string"},
+                    "user": {"$ref": "#/components/schemas/UserInfo"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证失败"
+          }
+        }
+      }
+    },
+    "/api/auth/validate": {
+      "post": {
+        "summary": "验证令牌",
+        "description": "验证 JWT 令牌的有效性",
+        "tags": ["认证"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "令牌有效",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/UserInfo"}
+              }
+            }
+          },
+          "401": {
+            "description": "令牌无效"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "列出所有用户",
+        "description": "获取用户列表，支持按组织筛选",
+        "tags": ["用户管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "query",
+            "description": "按组织ID筛选",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取用户列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/UserInfo"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "创建用户",
+        "description": "创建新用户",
+        "tags": ["用户管理"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/UserCreateRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "用户创建成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/UserInfo"}
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "summary": "获取用户详情",
+        "description": "根据用户ID获取用户详细信息",
+        "tags": ["用户管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取用户信息",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/UserInfo"}
+              }
+            }
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        }
+      },
+      "put": {
+        "summary": "更新用户",
+        "description": "更新用户信息",
+        "tags": ["用户管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/UserUpdateRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "用户更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除用户",
+        "description": "根据用户ID删除用户",
+        "tags": ["用户管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "用户删除成功"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "summary": "列出所有设备",
+        "description": "获取设备列表，支持多条件筛选",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "设备状态：online/offline/away",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "approved",
+            "in": "query",
+            "description": "是否已审批",
+            "schema": {"type": "boolean"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取设备列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Device"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "创建设备",
+        "description": "注册新设备",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/DeviceCreateRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "设备创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          }
+        }
+      }
+    },
+    "/api/devices/{id}": {
+      "get": {
+        "summary": "获取设备详情",
+        "description": "根据设备ID获取设备详细信息",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取设备信息",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Device"}
+              }
+            }
+          },
+          "404": {
+            "description": "设备不存在"
+          }
+        }
+      },
+      "put": {
+        "summary": "更新设备",
+        "description": "更新设备信息",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/DeviceUpdateRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "设备更新成功"
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除设备",
+        "description": "根据设备ID删除设备",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "设备删除成功"
+          },
+          "404": {
+            "description": "设备不存在"
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/approve": {
+      "post": {
+        "summary": "审批设备",
+        "description": "批准注册设备",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "设备审批成功"
+          },
+          "400": {
+            "description": "设备已审批或不存在"
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/status": {
+      "put": {
+        "summary": "更新设备状态",
+        "description": "更新设备在线状态",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {"type": "string", "enum": ["online", "offline", "away"]},
+                  "ip_address": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "状态更新成功"
+          }
+        }
+      }
+    },
+    "/api/devices/pending": {
+      "get": {
+        "summary": "列出待审批设备",
+        "description": "获取所有待审批的设备",
+        "tags": ["设备管理"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "成功获取待审批设备列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Device"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "summary": "列出审计日志",
+        "description": "获取审计日志列表，支持多条件筛选和分页",
+        "tags": ["审计日志"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "log_type",
+            "in": "query",
+            "description": "日志类型",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {"type": "integer", "default": 100}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {"type": "integer", "default": 0}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取审计日志列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/AuditLog"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit/{id}": {
+      "get": {
+        "summary": "获取审计日志详情",
+        "description": "根据日志ID获取审计日志详细信息",
+        "tags": ["审计日志"],
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功获取审计日志",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AuditLog"}
+              }
+            }
+          },
+          "404": {
+            "description": "日志不存在"
+          }
+        }
+      }
+    },
+    "/api/license/generate": {
+      "post": {
+        "summary": "生成许可证",
+        "description": "生成新的许可证密钥",
+        "tags": ["许可证管理"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["license_type", "duration_days"],
+                "properties": {
+                  "license_type": {"type": "string", "enum": ["basic", "pro", "enterprise"]},
+                  "duration_days": {"type": "integer"},
+                  "max_devices": {"type": "integer"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "许可证生成成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "许可证类型无效"
+          }
+        }
+      }
+    },
+    "/api/license/validate": {
+      "post": {
+        "summary": "验证许可证",
+        "description": "验证许可证密钥的有效性",
+        "tags": ["许可证管理"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["key"],
+                "properties": {
+                  "key": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "许可证有效",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/LicenseInfo"}
+              }
+            }
+          },
+          "400": {
+            "description": "许可证无效或已过期"
+          }
+        }
+      }
+    },
+    "/api/license": {
+      "get": {
+        "summary": "获取当前许可证",
+        "description": "获取系统中当前激活的许可证信息",
+        "tags": ["许可证管理"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "成功获取许可证信息",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/LicenseInfo"}
+              }
+            }
+          },
+          "404": {
+            "description": "没有激活的许可证"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT 访问令牌"
+      }
+    },
+    "schemas": {
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "username": {"type": "string"},
+          "email": {"type": "string"},
+          "role": {"type": "string"},
+          "organization_id": {"type": "string", "nullable": true}
+        }
+      },
+      "UserCreateRequest": {
+        "type": "object",
+        "required": ["username", "email", "password", "role"],
+        "properties": {
+          "username": {"type": "string"},
+          "email": {"type": "string"},
+          "password": {"type": "string"},
+          "role": {"type": "string", "enum": ["admin", "operator", "viewer"]},
+          "organization_id": {"type": "string", "nullable": true}
+        }
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string"},
+          "role": {"type": "string", "enum": ["admin", "operator", "viewer"]},
+          "is_active": {"type": "boolean"}
+        }
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "device_id": {"type": "string"},
+          "name": {"type": "string"},
+          "hostname": {"type": "string"},
+          "os_type": {"type": "string"},
+          "os_version": {"type": "string"},
+          "ip_address": {"type": "string", "nullable": true},
+          "status": {"type": "string", "enum": ["online", "offline", "away"]},
+          "approved": {"type": "boolean"},
+          "approved_by": {"type": "string", "nullable": true},
+          "approved_at": {"type": "string", "format": "date-time", "nullable": true},
+          "last_online": {"type": "string", "format": "date-time", "nullable": true},
+          "organization_id": {"type": "string", "nullable": true},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "DeviceCreateRequest": {
+        "type": "object",
+        "required": ["device_id", "name", "hostname", "os_type", "os_version"],
+        "properties": {
+          "device_id": {"type": "string"},
+          "name": {"type": "string"},
+          "hostname": {"type": "string"},
+          "os_type": {"type": "string"},
+          "os_version": {"type": "string"},
+          "ip_address": {"type": "string", "nullable": true},
+          "organization_id": {"type": "string", "nullable": true}
+        }
+      },
+      "DeviceUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "hostname": {"type": "string"},
+          "os_type": {"type": "string"},
+          "os_version": {"type": "string"},
+          "ip_address": {"type": "string", "nullable": true},
+          "status": {"type": "string", "enum": ["online", "offline", "away"]},
+          "approved": {"type": "boolean"}
+        }
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "log_type": {"type": "string"},
+          "action": {"type": "string"},
+          "user_id": {"type": "string", "nullable": true},
+          "username": {"type": "string", "nullable": true},
+          "device_id": {"type": "string", "nullable": true},
+          "device_name": {"type": "string", "nullable": true},
+          "ip_address": {"type": "string", "nullable": true},
+          "user_agent": {"type": "string", "nullable": true},
+          "details": {"type": "object", "nullable": true},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "LicenseInfo": {
+        "type": "object",
+        "properties": {
+          "license_type": {"type": "string", "enum": ["basic", "pro", "enterprise"]},
+          "duration_days": {"type": "integer"},
+          "max_devices": {"type": "integer", "nullable": true},
+          "issued_at": {"type": "string", "format": "date-time"},
+          "expires_at": {"type": "string", "format": "date-time"},
+          "is_valid": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}
