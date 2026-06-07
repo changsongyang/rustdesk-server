@@ -37,13 +37,17 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
       
       - name: Display vulnerabilities
         run: |
-          cat trivy-results.sarif | jq -r '.runs[0].results[] | "\(.rule.id): \(.message.text)"'
+          if command -v jq &> /dev/null; then
+            cat trivy-results.sarif | jq -r '.runs[0].results[] | "\(.rule.id): \(.message.text)"'
+          else
+            echo "jq not installed, skipping detailed output"
+          fi
 
   codeql:
     name: CodeQL Analysis
@@ -57,11 +61,11 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: rust
-      
+
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:rust"

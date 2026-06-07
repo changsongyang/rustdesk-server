@@ -60,7 +60,7 @@ jobs:
           cache-to: type=gha,mode=max
       
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.17
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           format: spdx-json
