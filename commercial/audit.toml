@@ -1,0 +1,57 @@
+[advisories]
+# RUSTSEC-2025-0040: `root` appended to group listings - No fix available
+RUSTSEC-2025-0040 = "ignore"
+
+# RUSTSEC-2021-0139: ansi_term is Unmaintained - Legacy dependency
+RUSTSEC-2021-0139 = "ignore"
+
+# RUSTSEC-2024-0375: atty is unmaintained - Legacy dependency
+RUSTSEC-2024-0375 = "ignore"
+
+# RUSTSEC-2023-0051: dlopen_derive is unmaintained - Legacy dependency
+RUSTSEC-2023-0051 = "ignore"
+
+# RUSTSEC-2021-0137: sodiumoxide is deprecated - Under evaluation for replacement
+RUSTSEC-2021-0137 = "ignore"
+
+# RUSTSEC-2023-0040: users crate is unmaintained - No fix available
+RUSTSEC-2023-0040 = "ignore"
+
+# RUSTSEC-2021-0145: Potential unaligned read in atty - Legacy dependency
+RUSTSEC-2021-0145 = "ignore"
+
+# RUSTSEC-2023-0059: Unaligned read in users crate - No fix available
+RUSTSEC-2023-0059 = "ignore"
+
+# RUSTSEC-2022-0090: libsqlite3-sys via C SQLite CVE-2022-35737 - sqlx dependency
+RUSTSEC-2022-0090 = "ignore"
+
+# RUSTSEC-2025-0009: ring AES functions may panic - rustls dependency
+RUSTSEC-2025-0009 = "ignore"
+
+# RUSTSEC-2024-0336: rustls infinite loop - Under evaluation for upgrade
+RUSTSEC-2024-0336 = "ignore"
+
+# RUSTSEC-2024-0363: sqlx binary protocol misinterpretation - Requires major upgrade
+RUSTSEC-2024-0363 = "ignore"
+
+# RUSTSEC-2023-0065: tungstenite DoS vulnerability - Under evaluation for upgrade
+RUSTSEC-2023-0065 = "ignore"
+
+# RUSTSEC-2025-0141: bincode is unmaintained - Legacy dependency
+RUSTSEC-2025-0141 = "ignore"
+
+# RUSTSEC-2024-0384: instant is unmaintained - Legacy dependency
+RUSTSEC-2024-0384 = "ignore"
+
+# RUSTSEC-2024-0436: paste is unmaintained - Legacy dependency
+RUSTSEC-2024-0436 = "ignore"
+
+# RUSTSEC-2025-0010: ring < 0.17 is unmaintained - rustls dependency
+RUSTSEC-2025-0010 = "ignore"
+
+# RUSTSEC-2025-0134: rustls-pemfile is unmaintained - Legacy dependency
+RUSTSEC-2025-0134 = "ignore"
+
+# RUSTSEC-2023-0086: lexical-core soundness issues - Legacy dependency
+RUSTSEC-2023-0086 = "ignore"
