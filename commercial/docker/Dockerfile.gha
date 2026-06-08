@@ -30,6 +30,7 @@ COPY libs/hbb_common /build/libs/hbb_common
 COPY commercial/Cargo.toml /build/commercial/
 COPY commercial/src /build/commercial/src
 COPY commercial/openapi.json /build/commercial/openapi.json
+COPY commercial/.env.example /build/commercial/.env.example
 
 # 构建优化配置
 ENV CARGO_PROFILE_RELEASE_LTO=true \
@@ -40,14 +41,14 @@ ENV CARGO_PROFILE_RELEASE_LTO=true \
 # 构建二进制文件
 WORKDIR /build/commercial
 # Cargo.lock 会在构建时重新生成以应用 patch 配置
-# 需要传递构建时环境变量
-ARG RENDEZVOUS_SERVER
-ARG RS_PUB_KEY
-ARG API_SERVER
-ENV RENDEZVOUS_SERVER=${RENDEZVOUS_SERVER}
-ENV RS_PUB_KEY=${RS_PUB_KEY}
-ENV API_SERVER=${API_SERVER}
+# 使用 build-arg 设置构建时环境变量（不在最终镜像中保留）
+ARG RENDEZVOUS_SERVER=""
+ARG RS_PUB_KEY=""
+ARG API_SERVER=""
 RUN rm -f Cargo.lock && \
+    RENDEZVOUS_SERVER="${RENDEZVOUS_SERVER}" \
+    RS_PUB_KEY="${RS_PUB_KEY}" \
+    API_SERVER="${API_SERVER}" \
     cargo build --release --target x86_64-unknown-linux-gnu
 
 # 清理构建产物
