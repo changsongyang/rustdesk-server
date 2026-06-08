@@ -27,6 +27,7 @@ COPY libs/hbb_common /build/libs/hbb_common
 
 # 复制商业版 Cargo 文件（用于缓存依赖层）
 COPY commercial/Cargo.toml /build/commercial/Cargo.toml
+COPY commercial/Cargo.lock /build/commercial/Cargo.lock
 
 # 复制商业版源代码
 COPY commercial/src /build/commercial/src
