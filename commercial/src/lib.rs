@@ -33,6 +33,7 @@ impl std::fmt::Debug for AppState {
 }
 
 impl AppState {
+    #[allow(clippy::let_underscore_future)]
     pub async fn new() -> Self {
         let _ = db::init_database();
 
