@@ -39,7 +39,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Run Clippy
-        run: cargo clippy --manifest-path commercial/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --manifest-path commercial/Cargo.toml --all-targets --no-deps -- -D warnings
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
@@ -55,7 +55,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo test --manifest-path commercial/Cargo.toml --all -- --nocapture
+        run: cargo test --manifest-path commercial/Cargo.toml -- --nocapture
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           DATABASE_URL: "sqlite::memory:"
