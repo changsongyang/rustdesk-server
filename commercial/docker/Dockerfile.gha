@@ -5,12 +5,10 @@
 # ==================== Build Stage ====================
 FROM rust:1.96-slim AS builder
 
-# 设置构建目标
-ARG BUILD_TARGET=x86_64-unknown-linux-gnu
-
 WORKDIR /build
 
 # 安装构建依赖
+# libsodium-sys 需要完整的构建工具链来从源代码编译 libsodium
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
@@ -18,19 +16,21 @@ RUN apt-get update && \
         git \
         ca-certificates \
         file \
+        make \
+        gcc \
+        autoconf \
+        automake \
+        libtool \
+        m4 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # 复制依赖文件以利用 Docker 层缓存
-# 依赖变更时此层会被重用，只有源代码变化时才重新编译
 COPY libs/hbb_common /build/libs/hbb_common
 COPY commercial/Cargo.toml commercial/Cargo.lock /build/commercial/
 COPY commercial/src /build/commercial/src
 
 # 构建优化配置
-# LTO (Link Time Optimization) 优化二进制大小和性能
-# strip 移除调试信息
-# codegen-units=1 优化性能但增加编译时间
 ENV CARGO_PROFILE_RELEASE_LTO=true \
     CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
     CARGO_PROFILE_RELEASE_STRIP=true \
@@ -38,9 +38,9 @@ ENV CARGO_PROFILE_RELEASE_LTO=true \
 
 # 构建二进制文件
 WORKDIR /build/commercial
-RUN cargo build --release --locked --target ${BUILD_TARGET}
+RUN cargo build --release --locked --target x86_64-unknown-linux-gnu
 
-# 移除 target 目录下不需要的文件以减小上下文大小
+# 清理构建产物
 RUN find target -name "*.a" -delete || true && \
     find target -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
 
@@ -72,7 +72,7 @@ RUN groupadd --gid 1000 rustdesk \
 WORKDIR /app
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /build/commercial/target/${BUILD_TARGET}/release/rustdesk-pro /app/
+COPY --from=builder /build/commercial/target/x86_64-unknown-linux-gnu/release/rustdesk-pro /app/
 COPY --from=builder /build/commercial/.env.example /app/.env.example
 
 # 设置权限
