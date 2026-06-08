@@ -38,8 +38,9 @@ ENV CARGO_PROFILE_RELEASE_LTO=true \
 
 # 构建二进制文件
 WORKDIR /build/commercial
-# 删除 Cargo.lock 以确保 patch 配置生效
-RUN rm -f Cargo.lock && \
+# 修改 hbb_common 的 Cargo.toml，强制使用新版本的 rustls-platform-verifier
+RUN sed -i 's/rustls-platform-verifier = "0.3.1"/rustls-platform-verifier = { git = "https:\/\/github.com\/rustls\/rustls-platform-verifier", rev = "996b1c903491641b17b3c9afb65d1352f6fc6b76" }/' /build/libs/hbb_common/Cargo.toml && \
+    rm -f Cargo.lock && \
     cargo build --release --target x86_64-unknown-linux-gnu
 
 # 清理构建产物
