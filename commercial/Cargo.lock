@@ -2825,7 +2825,7 @@ dependencies = [
 [[package]]
 name = "rustls-platform-verifier"
 version = "0.7.0"
-source = "git+https://github.com/rustls/rustls-platform-verifier?branch=main#acd3cda3b088cef02070e41f55027fa62ba0721c"
+source = "git+https://github.com/rustls/rustls-platform-verifier?rev=996b1c903491641b17b3c9afb65d1352f6fc6b76#996b1c903491641b17b3c9afb65d1352f6fc6b76"
 dependencies = [
  "core-foundation 0.10.1",
  "core-foundation-sys",
@@ -2834,7 +2834,7 @@ dependencies = [
  "once_cell",
  "rustls",
  "rustls-native-certs 0.8.4",
- "rustls-platform-verifier-android 0.1.1 (git+https://github.com/rustls/rustls-platform-verifier?branch=main)",
+ "rustls-platform-verifier-android 0.1.1 (git+https://github.com/rustls/rustls-platform-verifier?rev=996b1c903491641b17b3c9afb65d1352f6fc6b76)",
  "rustls-webpki 0.103.13",
  "security-framework 3.7.0",
  "security-framework-sys",
@@ -2851,7 +2851,7 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 [[package]]
 name = "rustls-platform-verifier-android"
 version = "0.1.1"
-source = "git+https://github.com/rustls/rustls-platform-verifier?branch=main#acd3cda3b088cef02070e41f55027fa62ba0721c"
+source = "git+https://github.com/rustls/rustls-platform-verifier?rev=996b1c903491641b17b3c9afb65d1352f6fc6b76#996b1c903491641b17b3c9afb65d1352f6fc6b76"
 
 [[package]]
 name = "rustls-webpki"

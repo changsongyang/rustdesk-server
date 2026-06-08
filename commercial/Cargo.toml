@@ -66,10 +66,12 @@ anyhow = "1"
 base64 = "0.22"
 
 # Fix rustls-platform-verifier compatibility with newer rustls-webpki
-rustls-platform-verifier = { git = "https://github.com/rustls/rustls-platform-verifier", branch = "main" }
+# v0.7.0
+rustls-platform-verifier = { git = "https://github.com/rustls/rustls-platform-verifier", rev = "996b1c903491641b17b3c9afb65d1352f6fc6b76" }
 
 [patch.crates-io]
-rustls-platform-verifier = { git = "https://github.com/rustls/rustls-platform-verifier", branch = "main" }
+# v0.7.0
+rustls-platform-verifier = { git = "https://github.com/rustls/rustls-platform-verifier", rev = "996b1c903491641b17b3c9afb65d1352f6fc6b76" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
