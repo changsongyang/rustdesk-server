@@ -65,6 +65,10 @@ anyhow = "1"
 # Base64 encoding
 base64 = "0.22"
 
+[patch.crates-io]
+# Fix rustls-platform-verifier compatibility with newer rustls-webpki
+rustls-platform-verifier = { git = "https://github.com/rustls/rustls-platform-verifier", branch = "main" }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 tokio-test = "0.4"

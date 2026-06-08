@@ -4641,3 +4641,8 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "rustls-platform-verifier"
+version = "0.7.0"
+source = "git+https://github.com/rustls/rustls-platform-verifier?branch=main#acd3cda3b088cef02070e41f55027fa62ba0721c"
