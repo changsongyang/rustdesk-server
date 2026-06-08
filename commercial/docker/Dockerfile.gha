@@ -30,7 +30,6 @@ COPY libs/hbb_common /build/libs/hbb_common
 COPY commercial/Cargo.toml /build/commercial/
 COPY commercial/src /build/commercial/src
 COPY commercial/openapi.json /build/commercial/openapi.json
-COPY commercial/.env.example /build/commercial/.env.example
 
 # 构建优化配置
 ENV CARGO_PROFILE_RELEASE_LTO=true \
@@ -84,7 +83,7 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/commercial/target/x86_64-unknown-linux-gnu/release/rustdesk-pro /app/
-COPY --from=builder /build/commercial/.env.example /app/.env.example
+COPY commercial/.env.example /app/.env.example
 
 # 设置权限
 RUN chown rustdesk:rustdesk /app/rustdesk-pro \
