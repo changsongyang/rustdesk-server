@@ -22,6 +22,7 @@ COPY libs/hbb_common /build/libs/hbb_common
 
 # Copy commercial Cargo files for better caching
 COPY commercial/Cargo.toml /build/commercial/Cargo.toml
+COPY commercial/Cargo.lock /build/commercial/Cargo.lock
 
 # Copy commercial source code
 COPY commercial/src /build/commercial/src
