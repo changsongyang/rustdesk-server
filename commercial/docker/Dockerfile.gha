@@ -27,7 +27,7 @@ RUN apt-get update && \
 
 # 复制依赖文件以利用 Docker 层缓存
 COPY libs/hbb_common /build/libs/hbb_common
-COPY commercial/Cargo.toml commercial/Cargo.lock /build/commercial/
+COPY commercial/Cargo.toml /build/commercial/
 COPY commercial/src /build/commercial/src
 
 # 构建优化配置

@@ -25,14 +25,13 @@ COPY libs/hbb_common /build/libs/hbb_common
 
 # Copy commercial Cargo files first for better caching
 COPY commercial/Cargo.toml /build/commercial/Cargo.toml
-COPY commercial/Cargo.lock /build/commercial/Cargo.lock
 
 # Copy actual commercial source code
 COPY commercial/src /build/commercial/src
 
 # Build the application
 WORKDIR /build/commercial
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # ==================== Runtime Stage ====================
 FROM debian:bookworm-slim
