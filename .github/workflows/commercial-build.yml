@@ -4,7 +4,7 @@ name: Commercial Build
 # Based on community edition build.yaml with commercial-specific modifications
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 on:
@@ -40,6 +40,7 @@ env:
   RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
   RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
   API_SERVER: ${{ secrets.API_SERVER }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
 
