@@ -56,9 +56,6 @@ RUN mkdir -p /app/data /app/logs /app/keys && \
 # Copy binary from builder
 COPY --from=builder /build/commercial/target/release/rustdesk-pro /app/rustdesk-pro
 
-# Copy default configuration
-COPY commercial/.env.example /app/.env.example
-
 # Set ownership
 RUN chown -R rustdesk:rustdesk /app && \
     chmod +x /app/rustdesk-pro

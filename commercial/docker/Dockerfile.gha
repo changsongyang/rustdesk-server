@@ -83,7 +83,6 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/commercial/target/x86_64-unknown-linux-gnu/release/rustdesk-pro /app/
-COPY commercial/.env.example /app/.env.example
 
 # 设置权限
 RUN chown rustdesk:rustdesk /app/rustdesk-pro \
