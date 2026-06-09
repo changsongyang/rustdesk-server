@@ -258,6 +258,10 @@ jobs:
             ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
             ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-${{ matrix.job.name }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            RENDEZVOUS_SERVER=${{ secrets.RENDEZVOUS_SERVER }}
+            RS_PUB_KEY=${{ secrets.RS_PUB_KEY }}
+            API_SERVER=${{ secrets.API_SERVER }}
 
   # Docker build and push of multiarch images
   docker-manifest:
