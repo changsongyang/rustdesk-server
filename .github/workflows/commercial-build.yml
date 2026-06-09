@@ -386,6 +386,10 @@ jobs:
         run: |
           T=${GITHUB_REF#refs/*/}
           echo "GIT_TAG=$T" >> $GITHUB_ENV
+          # 提取纯版本号（去掉 pro-v 前缀）用于 Debian 包
+          VERSION=${T#pro-v}
+          VERSION=${VERSION#pro-}
+          echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Build debian package
         run: |
@@ -396,7 +400,7 @@ jobs:
           mkdir -p debian-package/DEBIAN
           cat > debian-package/DEBIAN/control << EOF
           Package: rustdesk-pro-server
-          Version: ${{ env.GIT_TAG }}
+          Version: ${{ env.DEB_VERSION }}
           Section: net
           Priority: optional
           Architecture: ${{ matrix.job.debian_platform }}
