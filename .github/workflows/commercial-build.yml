@@ -245,8 +245,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: "."
-          dockerfile: "./commercial/docker/Dockerfile"
+          context: .
+          dockerfile: commercial/docker/Dockerfile
           platforms: ${{ matrix.job.docker_platform }}
           push: true
           provenance: false
