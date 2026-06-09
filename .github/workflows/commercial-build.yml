@@ -246,7 +246,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          dockerfile: commercial/docker/Dockerfile
+          dockerfile: commercial/docker/Dockerfile.gha
           platforms: ${{ matrix.job.docker_platform }}
           push: true
           provenance: false
