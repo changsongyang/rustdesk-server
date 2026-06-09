@@ -58,7 +58,7 @@ jobs:
     steps:
       
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -94,7 +94,7 @@ jobs:
         run: chmod -v a+x commercial/target/${{ matrix.job.target }}/release/*
 
       - name: Publish Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
           path: |
@@ -109,7 +109,7 @@ jobs:
     steps:
       
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -128,7 +128,7 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
       - name: Publish Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-windows-x86_64
           path: |
@@ -156,7 +156,7 @@ jobs:
     steps:
 
       - name: Download binaries (${{ matrix.job.os }} - ${{ matrix.job.name }})
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-${{ matrix.job.os }}-${{ matrix.job.name }}
           path: ${{ matrix.job.name }}
@@ -171,7 +171,7 @@ jobs:
           zip ${{ matrix.job.name }}/rustdesk-pro-server-${{ matrix.job.os }}-${{ matrix.job.name }}${{ matrix.job.suffix }}.zip ${{ matrix.job.name }}/*
 
       - name: Create Release (${{ matrix.job.os }} - (${{ matrix.job.name }})
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: ${{ matrix.job.name }}/rustdesk-pro-server-${{ matrix.job.os }}-${{ matrix.job.name }}${{ matrix.job.suffix }}.zip
@@ -194,12 +194,12 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
         
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
           path: commercial/docker/rootfs/usr/bin
@@ -245,7 +245,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: "./commercial/docker"
+          context: "."
+          dockerfile: "./commercial/docker/Dockerfile"
           platforms: ${{ matrix.job.docker_platform }}
           push: true
           provenance: false
@@ -360,10 +361,10 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
           path: binaries
@@ -406,7 +407,7 @@ jobs:
           fakeroot dpkg-deb --build debian-package rustdesk-pro-server-${{ env.GIT_TAG }}-${{ matrix.job.name }}.deb
 
       - name: Publish Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: debian-package-${{ matrix.job.name }}
           path: rustdesk-pro-server-${{ env.GIT_TAG }}-${{ matrix.job.name }}.deb
@@ -430,13 +431,13 @@ jobs:
     steps:
 
       - name: Download debian package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: debian-package-${{ matrix.job.name }}
           path: .
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: rustdesk-pro-server-*.deb
