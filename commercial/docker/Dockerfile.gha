@@ -1,9 +1,31 @@
-# RustDesk Pro Server - Dockerfile (GitHub Actions 版本)
-# 适用于 GitHub Actions CI/CD 环境
-# commercial-build.yml 会下载预编译的二进制文件到 rootfs 目录
+# RustDesk Pro Server - Dockerfile (GitHub Actions 专用版本)
+# ============================================================
+# 适用场景：GitHub Actions CI/CD 自动化构建流程
+# 
+# 特性：
+# - 不包含构建阶段，使用预编译二进制
+# - 从 rootfs 目录复制已编译的二进制文件
+# - 适用于多架构交叉编译场景
+# - 配合 commercial-build.yml 和 commercial-cd.yml 使用
+# 
+# 使用方式：
+# 1. commercial-build.yml 编译二进制并上传为 artifacts
+# 2. commercial-cd.yml 下载 artifacts 到 commercial/docker/rootfs/usr/bin
+# 3. 使用此 Dockerfile 构建镜像
+# 
+# 构建命令：
+#   docker build -t rustdesk-pro-server:gha -f commercial/docker/Dockerfile.gha .
 
-# ==================== Runtime Stage ====================
+# ==================== 运行阶段 ====================
 FROM debian:bookworm-slim
+
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - GitHub Actions Build"
+LABEL version="1.0.0"
+LABEL build-type="github-actions"
+
+# 设置工作目录
+WORKDIR /app
 
 # 安装运行时依赖
 RUN apt-get update && \
@@ -15,31 +37,42 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# 创建非 root 用户
+# 创建非 root 用户（安全最佳实践）
 RUN useradd -m -s /bin/bash rustdesk
 
-# 创建目录
+# 创建必要目录
 RUN mkdir -p /app/data /app/logs /app/keys && \
     chown -R rustdesk:rustdesk /app
 
-# 复制二进制文件（从 rootfs 目录）
+# 复制二进制文件（从 rootfs 目录，由 GitHub Actions 预先放置）
+# 注意：此文件必须在构建前由 commercial-cd.yml 的步骤准备好
 COPY commercial/docker/rootfs/usr/bin /usr/bin
 
-# 设置权限
+# 设置可执行权限
 RUN chmod -v a+x /usr/bin/*
 
 # 切换到非 root 用户
 USER rustdesk
 
-# 设置工作目录
-WORKDIR /app
-
 # 暴露端口
+# 21114: TCP 控制端口
+# 21115: TCP 数据端口
+# 21116: HTTP API 端口
+# 21117: HTTPS API 端口
+# 21118: WebSocket 端口
+# 21119: Relay 端口
 EXPOSE 21114 21115 21116 21117 21118 21119
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:21116/api/version || exit 1
 
-# 启动脚本
+# 环境变量（默认值）
+ENV SERVER_PORT=21116 \
+    SERVER_HOST=0.0.0.0 \
+    DATABASE_URL=sqlite:./data/rustdesk_pro.db \
+    PRO_DB_URL=./data/rustdesk_pro.db \
+    LOG_LEVEL=info
+
+# 启动命令
 ENTRYPOINT ["/usr/bin/rustdesk-pro"]

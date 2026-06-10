@@ -1,26 +1,48 @@
-# RustDesk Pro Server - Windows Dockerfile
-# Uses pre-built Windows binary
-# Build: podman build -t rustdesk-pro-server:windows -f Dockerfile.windows ..
+# RustDesk Pro Server - Dockerfile (Windows 版本)
+# ======================================================
+# 适用场景：Windows 服务器部署、Windows 容器环境
+# 
+# 特性：
+# - 使用预编译的 Windows 二进制文件
+# - 基于 Windows Server Core 镜像
+# - 支持 Windows 容器网络
+# 
+# 使用方式：
+# 1. 在 Windows 环境编译二进制：cargo build --release --target=x86_64-pc-windows-msvc
+# 2. 复制二进制到 target/release 目录
+# 3. 构建镜像：docker build -t rustdesk-pro-server:windows -f Dockerfile.windows ..
+# 
+# 运行命令：
+#   docker run -d -p 21114-21119:21114-21119 -v C:\data:C:\app\data \
+#              rustdesk-pro-server:windows
 
+# 使用 Windows Server Core 作为基础镜像
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - Windows Version"
+LABEL version="1.0.0"
+LABEL build-type="windows"
+
+# 设置工作目录
 WORKDIR C:\app
 
-# Copy the pre-built binary
-COPY target/release/rustdesk-pro.exe .
-
-# Create necessary directories
+# 创建必要目录
 RUN mkdir data logs keys
 
-# Expose port
-EXPOSE 8080
+# 复制预编译的 Windows 二进制文件
+# 编译命令：cargo build --release --target=x86_64-pc-windows-msvc
+COPY target/release/rustdesk-pro.exe .
 
-# Set environment variables
-ENV SERVER_PORT=8080 \
+# 暴露端口
+EXPOSE 21114 21115 21116 21117 21118 21119
+
+# 设置环境变量
+ENV SERVER_PORT=21116 \
     SERVER_HOST=0.0.0.0 \
     DATABASE_URL=sqlite:./data/rustdesk_pro.db \
     PRO_DB_URL=./data/rustdesk_pro.db \
     LOG_LEVEL=info
 
-# Run the application
-CMD ["rustdesk-pro.exe", "serve"]
+# 启动命令
+CMD ["rustdesk-pro.exe"]

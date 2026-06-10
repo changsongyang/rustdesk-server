@@ -1,54 +1,77 @@
-# RustDesk Pro Server - Simple Dockerfile (uses pre-built binary)
-# This requires you to first build the binary on a Linux machine or cross-compile
-# For Windows users, use the local binary directly
+# RustDesk Pro Server - Dockerfile (简化版本)
+# ======================================================
+# 适用场景：快速部署、测试环境、需要使用预编译二进制的场景
+# 
+# 特性：
+# - 使用预编译二进制文件
+# - 最小化镜像配置
+# - 简化的构建流程
+# - 适用于已有编译环境的团队
+# 
+# 使用方式：
+# 1. 先在 Linux 环境编译二进制：cargo build --release
+# 2. 复制二进制到当前目录：cp ../target/release/rustdesk-pro ./rustdesk-pro-linux
+# 3. 构建镜像：docker build -t rustdesk-pro-server:simple -f Dockerfile.simple .
+# 
+# 运行命令：
+#   docker run -d -p 21114-21119:21114-21119 -v ./data:/app/data \
+#              rustdesk-pro-server:simple
 
 FROM debian:bookworm-slim
 
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - Simplified Version"
+LABEL version="1.0.0"
+LABEL build-type="simple"
+
+# 设置工作目录
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    sqlite3 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# 安装运行时依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        sqlite3 \
+        curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Create non-root user for security
+# 创建非 root 用户（安全最佳实践）
 RUN useradd -m -s /bin/bash rustdesk
 
-# Create necessary directories
+# 创建必要目录
 RUN mkdir -p /app/data /app/logs /app/keys && \
     chown -R rustdesk:rustdesk /app
 
-# IMPORTANT: You need to copy the Linux binary here first!
-# Build it with: cargo build --release (on Linux or cross-compile)
-# Then copy: cp ../target/release/rustdesk-pro ./rustdesk-pro-linux
+# 复制预编译二进制文件
+# 注意：需预先将 Linux 二进制文件复制到当前目录
+# 编译命令：cargo build --release
 COPY rustdesk-pro-linux /app/rustdesk-pro 2>/dev/null || true
 
-# Copy default configuration
+# 复制默认配置文件
 COPY .env.example /app/.env.example
 
-# Set ownership
+# 设置权限
 RUN chown -R rustdesk:rustdesk /app && \
     chmod +x /app/rustdesk-pro 2>/dev/null || true
 
-# Switch to non-root user
+# 切换到非 root 用户
 USER rustdesk
 
-# Expose port
-EXPOSE 8080
+# 暴露端口
+EXPOSE 21114 21115 21116 21117 21118 21119
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:21116/api/version || exit 1
 
-# Set environment variables
-ENV SERVER_PORT=8080 \
+# 环境变量（默认值）
+ENV SERVER_PORT=21116 \
     SERVER_HOST=0.0.0.0 \
     DATABASE_URL=sqlite:./data/rustdesk_pro.db \
     PRO_DB_URL=./data/rustdesk_pro.db \
     LOG_LEVEL=info
 
-# Run the application
-CMD ["./rustdesk-pro", "serve"]
+# 启动命令
+CMD ["./rustdesk-pro"]

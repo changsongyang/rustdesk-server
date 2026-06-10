@@ -1,86 +1,131 @@
 name: CI
 
+# RustDesk Pro Server - 持续集成工作流
+# 职责：代码质量检查、编译验证、单元测试
+# 触发时机：push 到 main/develop 分支、pull request
+
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
-  RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
-  API_SERVER: ${{ secrets.API_SERVER }}
 
 jobs:
+  # 代码格式化检查
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Rust toolchain with rustfmt
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      
       - name: Check formatting
         run: cargo fmt --manifest-path commercial/Cargo.toml -- --check
 
+  # 静态分析检查
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Rust toolchain with clippy
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - name: Cache cargo
+      
+      - name: Cache cargo dependencies
         uses: Swatinem/rust-cache@v2
+      
       - name: Run Clippy
         run: cargo clippy --manifest-path commercial/Cargo.toml --all-targets --no-deps -- -D warnings
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
+  # 单元测试
   test:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo dependencies
         uses: Swatinem/rust-cache@v2
+      
       - name: Run tests
         run: cargo test --manifest-path commercial/Cargo.toml -- --nocapture
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           DATABASE_URL: "sqlite::memory:"
 
+  # 编译验证
   build:
-    name: Build
+    name: Build Validation
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Cache cargo
+      
+      - name: Cache cargo dependencies
         uses: Swatinem/rust-cache@v2
+      
       - name: Build
         run: cargo build --manifest-path commercial/Cargo.toml --release --target ${{ matrix.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+  # 综合检查汇总
+  summary:
+    name: CI Summary
+    needs: [fmt, clippy, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      
+      - name: Report CI status
+        run: |
+          echo "✅ All CI checks passed!"
+          echo "📊 Summary:"
+          echo "- Formatting: PASSED"
+          echo "- Static Analysis: PASSED"
+          echo "- Unit Tests: PASSED"
+          echo "- Build Validation: PASSED"

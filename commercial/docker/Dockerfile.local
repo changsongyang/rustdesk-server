@@ -1,37 +1,67 @@
-# RustDesk Pro Server - Dockerfile (本地构建版本 - 国内加速)
-# 适用于中国大陆网络环境，使用国内镜像源加速依赖下载
-# Build: podman build -t rustdesk-pro-server:local -f commercial/docker/Dockerfile.local .
+# RustDesk Pro Server - Dockerfile (本地开发版本 - 国内加速)
+# ==============================================================
+# 适用场景：中国大陆网络环境、本地开发调试、快速构建测试
+# 
+# 特性：
+# - 使用国内镜像源加速依赖下载
+# - 包含调试工具和开发依赖
+# - 支持热重载（可选）
+# - 保留构建缓存便于开发迭代
+# 
+# 构建命令：
+#   docker build -t rustdesk-pro-server:local -f commercial/docker/Dockerfile.local .
+# 
+# 运行命令：
+#   docker run -d -p 21114-21119:21114-21119 -v ./data:/app/data -v ./logs:/app/logs \
+#              rustdesk-pro-server:local
+# 
+# 调试模式：
+#   docker run -it --rm -p 21114-21119:21114-21119 rustdesk-pro-server:local bash
 
-# ==================== Build Stage ====================
-FROM rust:1.96 as builder
+# ==================== 构建阶段 ====================
+FROM rust:1.96 AS builder
 
+LABEL stage=builder
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server Builder (China Mirror)"
+
+# 设置工作目录
 WORKDIR /build
 
-# 安装构建依赖（使用阿里云 Debian 源）
-# 清除默认源配置，替换为阿里云源
+# 配置国内 Debian 源（加速依赖安装）
 RUN rm -f /etc/apt/sources.list.d/*.list && \
     echo 'deb http://mirrors.aliyun.com/debian bookworm main non-free-firmware' > /etc/apt/sources.list && \
     echo 'deb http://mirrors.aliyun.com/debian bookworm-updates main non-free-firmware' >> /etc/apt/sources.list && \
-    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list && \
-    apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list
+
+# 安装构建依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        pkg-config \
+        libssl-dev \
+        git \
+        ca-certificates \
+        vim \
+        nano \
+        iputils-ping \
+        net-tools \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # 创建目录结构
 RUN mkdir -p /build/commercial /build/libs
 
-# 复制 hbb_common 子模块（从根目录）
+# 复制子模块
 COPY libs/hbb_common /build/libs/hbb_common
 
-# 复制商业版 Cargo 文件（用于缓存依赖层）
+# 复制 Cargo 配置文件
 COPY commercial/Cargo.toml /build/commercial/Cargo.toml
+COPY commercial/Cargo.lock /build/commercial/Cargo.lock
 
-# 复制商业版源代码
+# 复制源代码
 COPY commercial/src /build/commercial/src
 
-# 配置国内镜像源加速
+# 配置国内 Crates 镜像（加速 Rust 依赖下载）
 RUN mkdir -p ~/.cargo && \
     cat > ~/.cargo/config.toml << 'EOF'
 [source.crates-io]
@@ -45,42 +75,56 @@ git-fetch-with-cli = true
 timeout = 300
 EOF
 
-# 配置 Git 使用国内加速（可选，如 ghproxy）
+# 可选：配置 GitHub 镜像加速
 # RUN git config --global url."https://ghproxy.com/https://github.com/".insteadOf "https://github.com/"
 
-# 切换到商业版目录并构建
+# 构建应用
 WORKDIR /build/commercial
 RUN cargo build --release
 
-# ==================== Runtime Stage ====================
+# ==================== 运行阶段 ====================
 FROM debian:bookworm-slim
 
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - Local Development (China Mirror)"
+LABEL version="1.0.0"
+LABEL build-type="local-development"
+
+# 设置工作目录
 WORKDIR /app
 
-# 安装运行时依赖（使用阿里云 Debian 源）
-# 清除默认源配置，替换为阿里云源
+# 配置国内 Debian 源（加速依赖安装）
 RUN rm -f /etc/apt/sources.list.d/*.list && \
     echo 'deb http://mirrors.aliyun.com/debian bookworm main non-free-firmware' > /etc/apt/sources.list && \
     echo 'deb http://mirrors.aliyun.com/debian bookworm-updates main non-free-firmware' >> /etc/apt/sources.list && \
-    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list && \
-    apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    sqlite3 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    echo 'deb http://mirrors.aliyun.com/debian-security bookworm-security main non-free-firmware' >> /etc/apt/sources.list
+
+# 安装运行时依赖（包含调试工具）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        sqlite3 \
+        curl \
+        vim \
+        nano \
+        iputils-ping \
+        net-tools \
+        procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # 创建非 root 用户
 RUN useradd -m -s /bin/bash rustdesk
 
 # 创建必要目录
-RUN mkdir -p /app/data /app/logs /app/keys && \
+RUN mkdir -p /app/data /app/logs /app/keys /app/config && \
     chown -R rustdesk:rustdesk /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/commercial/target/release/rustdesk-pro /app/rustdesk-pro
 
-# 复制默认配置
+# 复制默认配置文件（便于开发调试）
 COPY commercial/.env.example /app/.env.example
 
 # 设置权限
@@ -91,18 +135,19 @@ RUN chown -R rustdesk:rustdesk /app && \
 USER rustdesk
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 21114 21115 21116 21117 21118 21119
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# 健康检查（开发环境更宽松的配置）
+HEALTHCHECK --interval=60s --timeout=30s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:21116/api/version || exit 1
 
-# 环境变量
-ENV SERVER_PORT=8080 \
+# 环境变量（开发环境默认值）
+ENV SERVER_PORT=21116 \
     SERVER_HOST=0.0.0.0 \
     DATABASE_URL=sqlite:./data/rustdesk_pro.db \
     PRO_DB_URL=./data/rustdesk_pro.db \
-    LOG_LEVEL=info
+    LOG_LEVEL=debug \
+    RUST_LOG=rustdesk_pro=debug,hbb_common=info
 
-# 启动应用
-CMD ["./rustdesk-pro", "serve"]
+# 启动命令
+CMD ["./rustdesk-pro"]

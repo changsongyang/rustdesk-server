@@ -1,13 +1,68 @@
-# RustDesk Pro Server Docker Image (for CI/CD)
-# This Dockerfile is used in GitHub Actions to build the final Docker image
-# It expects pre-built binaries to be copied into the image
+# RustDesk Pro Server - Dockerfile (s6-overlay 版本)
+# ======================================================
+# 适用场景：需要进程管理的生产环境、容器编排场景
+# 
+# 特性：
+# - 使用 s6-overlay 进行进程管理
+# - 支持优雅启停
+# - 日志管理
+# - 健康检查集成
+# 
+# 构建命令：
+#   docker build -t rustdesk-pro-server:s6 -f commercial/docker/Dockerfile.s6 .
+# 
+# 运行命令：
+#   docker run -d -p 21114-21119:21114-21119 -v ./data:/app/data \
+#              rustdesk-pro-server:s6
 
+# ==================== 构建阶段 ====================
+FROM rust:1.96 AS builder
+
+LABEL stage=builder
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+
+WORKDIR /build
+
+# 安装构建依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        pkg-config \
+        libssl-dev \
+        git \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 创建目录结构
+RUN mkdir -p /build/commercial /build/libs
+
+# 复制子模块
+COPY libs/hbb_common /build/libs/hbb_common
+
+# 复制 Cargo 配置文件
+COPY commercial/Cargo.toml /build/commercial/Cargo.toml
+COPY commercial/Cargo.lock /build/commercial/Cargo.lock
+
+# 复制源代码
+COPY commercial/src /build/commercial/src
+
+# 构建应用
+WORKDIR /build/commercial
+RUN cargo build --release
+
+# ==================== 运行阶段 ====================
 FROM busybox:stable
 
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - s6-overlay Process Management"
+LABEL version="1.0.0"
+LABEL build-type="s6-overlay"
+
+# s6-overlay 版本配置
 ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG S6_ARCH=x86_64
 
-# Download and install s6-overlay
+# 下载并安装 s6-overlay
 ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
 ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz /tmp
 
@@ -20,27 +75,30 @@ RUN \
   adduser -D -h /app rustdesk && \
   chown -R rustdesk:rustdesk /app
 
-# Copy s6-overlay service configuration
-COPY rootfs /
+# 复制二进制文件
+COPY --from=builder /build/commercial/target/release/rustdesk-pro /usr/bin/rustdesk-pro
+RUN chmod +x /usr/bin/rustdesk-pro
 
-# Set environment variables
-ENV SERVER_PORT=8080
-ENV SERVER_HOST=0.0.0.0
-ENV DATABASE_URL=sqlite:./data/rustdesk_pro.db
-ENV LOG_LEVEL=info
+# 复制 s6-overlay 服务配置
+COPY commercial/docker/rootfs /
 
-# Expose ports
-# HTTP API port
-EXPOSE 8080
+# 设置环境变量
+ENV SERVER_PORT=21116 \
+    SERVER_HOST=0.0.0.0 \
+    DATABASE_URL=sqlite:./data/rustdesk_pro.db \
+    LOG_LEVEL=info
 
-# Health check
+# 暴露端口
+EXPOSE 21114 21115 21116 21117 21118 21119
+
+# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s CMD /usr/bin/healthcheck.sh
 
-# Set working directory
+# 设置工作目录
 WORKDIR /app
 
-# Create volume for data persistence
+# 创建数据卷
 VOLUME /app/data /app/logs /app/keys
 
-# Entry point
+# s6-overlay 入口点
 ENTRYPOINT ["/init"]

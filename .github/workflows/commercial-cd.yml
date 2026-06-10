@@ -5,6 +5,8 @@ on:
     branches: [main]
     tags:
       - 'v*'
+      - 'pro-v*'
+      - 'pro-*'
   workflow_dispatch:
 
 permissions:
@@ -16,13 +18,24 @@ env:
   CARGO_TERM_COLOR: always
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  GHCR_IMAGE: ghcr.io/changsongyang/rustdesk-pro-server
+  DOCKERHUB_IMAGE: ycstech/rustdesk-pro-server
+  LATEST_TAG: latest
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Image
+  # Build and push single-arch Docker images
+  docker:
+    name: Docker push - ${{ matrix.job.name }}
     runs-on: ubuntu-latest
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { name: "amd64",   docker_platform: "linux/amd64" }
+          - { name: "arm64v8", docker_platform: "linux/arm64" }
+          - { name: "armv7",   docker_platform: "linux/arm/v7" }
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -30,32 +43,22 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       
-      - name: Install toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Download binaries from commercial-build
+        uses: dawidd6/action-download-artifact@v2
         with:
-          toolchain: "1.96"
-          targets: x86_64-unknown-linux-musl
-      
-      - name: Install cross tool
-        run: cargo install cross --git https://github.com/rust-embedded/cross
-      
-      - name: Install OpenSSL
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
-      
-      - name: Build binary
-        run: |
-          rm -f commercial/Cargo.lock
-          cross build --manifest-path commercial/Cargo.toml --release --target=x86_64-unknown-linux-musl
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-          OPENSSL_DIR: /usr
-          OPENSSL_STATIC: 1
+          workflow: commercial-build.yml
+          branch: main
+          path: artifacts
       
       - name: Copy binary to rootfs
         run: |
           mkdir -p commercial/docker/rootfs/usr/bin
-          cp commercial/target/x86_64-unknown-linux-musl/release/rustdesk-pro commercial/docker/rootfs/usr/bin/
+          cp artifacts/binaries-linux-${{ matrix.job.name }}/rustdesk-pro commercial/docker/rootfs/usr/bin/ 2>/dev/null || \
+            cp artifacts/binaries-linux-${{ matrix.job.name }}/* commercial/docker/rootfs/usr/bin/
           chmod +x commercial/docker/rootfs/usr/bin/*
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,25 +70,121 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      
+      - name: Get git tag
+        id: vars
+        run: |
+          T=${GITHUB_REF#refs/*/}
+          M=${T%%.*}
+          echo "GIT_TAG=$T" >> $GITHUB_ENV
+          echo "MAJOR_TAG=$M" >> $GITHUB_ENV
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./commercial/docker/Dockerfile.gha
+          platforms: ${{ matrix.job.docker_platform }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          tags: |
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-${{ matrix.job.name }}
+
+  # Create multi-arch manifests
+  docker-manifest:
+    name: Docker manifest
+    needs: docker
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Get git tag
+        id: vars
+        run: |
+          T=${GITHUB_REF#refs/*/}
+          M=${T%%.*}
+          echo "GIT_TAG=$T" >> $GITHUB_ENV
+          echo "MAJOR_TAG=$M" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: changsongyang
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub manifests
+      - name: Create and push manifest (Docker Hub :version)
+        uses: Noelware/docker-manifest-action@0.4.3
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-armv7
+          push: true
+
+      - name: Create and push manifest (Docker Hub :major)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-armv7
+          push: true
+
+      - name: Create and push manifest (Docker Hub :latest)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-armv7
+          push: true
+
+      # GHCR manifests
+      - name: Create and push manifest (GHCR :version)
+        uses: Noelware/docker-manifest-action@0.4.3
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-armv7
+          push: true
+
+      - name: Create and push manifest (GHCR :major)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-armv7
+          push: true
+
+      - name: Create and push manifest (GHCR :latest)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-armv7
+          push: true
+
+  # SBOM generation and release
+  release:
+    name: Create Release
+    needs: docker-manifest
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
       
       - name: Generate SBOM
         uses: anchore/sbom-action@v0.24.0
@@ -93,22 +192,6 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           format: spdx-json
           output-file: sbom.spdx.json
-      
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: sbom
-          path: sbom.spdx.json
-
-  release:
-    name: Create Release
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
       
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -118,9 +201,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Update Docker Compose
   docker-compose:
     name: Update Docker Compose
-    needs: build-and-push
+    needs: docker
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
