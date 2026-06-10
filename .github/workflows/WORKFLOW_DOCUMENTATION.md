@@ -5,7 +5,7 @@
 | 属性 | 值 |
 |------|-----|
 | 文档名称 | RustDesk Pro Server CI/CD 工作流文档 |
-| 版本 | v1.0.0 |
+| 版本 | v1.1.0 |
 | 创建日期 | 2026-06-10 |
 | 最后更新 | 2026-06-10 |
 | 适用范围 | 商业版 RustDesk Pro Server |
@@ -999,12 +999,16 @@ needs: [github-release, docker-manifest]
 | v1.0.0 | 2026-06-10 | 初始版本，创建完整工作流体系 | RustDesk Team |
 | v1.1.0 | 2026-06-10 | 添加 Build & Deploy 统一工作流 | RustDesk Team |
 | v1.2.0 | 2026-06-10 | 优化 Dockerfile.local 国内镜像配置 | RustDesk Team |
+| v1.3.0 | 2026-06-10 | 修复 Gitleaks Action 版本问题，更新为官方维护版本 | RustDesk Team |
+| v1.4.0 | 2026-06-10 | 修复 Docker 标签格式错误，添加 GIT_TAG 变量设置 | RustDesk Team |
+| v1.5.0 | 2026-06-10 | 修复 Debian 包版本号为空问题，添加 pre-build 依赖 | RustDesk Team |
 
 ### 10.2 文档更新记录
 
 | 版本 | 日期 | 更新内容 | 更新人 |
 |------|------|---------|--------|
 | v1.0.0 | 2026-06-10 | 创建完整工作流文档 | RustDesk Team |
+| v1.1.0 | 2026-06-10 | 更新版本历史，添加 v1.3.0-v1.5.0 变更记录 | RustDesk Team |
 
 ### 10.3 变更管理流程
 
