@@ -294,8 +294,9 @@ jobs:
           username: changsongyang
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Docker Hub manifests
       # manifest for :pro-1.2.3 tag
-      - name: Create and push manifest (:ve.rs.ion)
+      - name: Create and push manifest (Docker Hub :version)
         uses: Noelware/docker-manifest-action@0.4.3
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -304,7 +305,7 @@ jobs:
           push: true
 
       # manifest for :pro-1 tag (major release)
-      - name: Create and push manifest (:major)
+      - name: Create and push manifest (Docker Hub :major)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}
@@ -312,7 +313,7 @@ jobs:
           push: true
 
       # manifest for :latest tag
-      - name: Create and push manifest (:latest)
+      - name: Create and push manifest (Docker Hub :latest)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}
@@ -321,7 +322,7 @@ jobs:
 
       # GHCR manifests
       # manifest for :pro-1.2.3 tag
-      - name: Create and push GHCR manifest (:ve.rs.ion)
+      - name: Create and push manifest (GHCR :version)
         uses: Noelware/docker-manifest-action@0.4.3
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -330,7 +331,7 @@ jobs:
           push: true
 
       # manifest for :pro-1 tag (major release)
-      - name: Create and push GHCR manifest (:major)
+      - name: Create and push manifest (GHCR :major)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}
@@ -338,7 +339,7 @@ jobs:
           push: true
 
       # manifest for :latest tag
-      - name: Create and push GHCR manifest (:latest)
+      - name: Create and push manifest (GHCR :latest)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}
