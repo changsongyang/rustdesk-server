@@ -1,70 +1,9 @@
 # RustDesk Pro Server - Dockerfile (GitHub Actions 版本)
 # 适用于 GitHub Actions CI/CD 环境
-# Build: docker build -t rustdesk-pro-server:gha -f commercial/docker/Dockerfile.gha .
-
-# ==================== Build Stage ====================
-FROM rust:1.96-slim AS builder
-
-WORKDIR /build
-
-# 安装构建依赖
-# libsodium-sys 需要完整的构建工具链来从源代码编译 libsodium
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        pkg-config \
-        libssl-dev \
-        git \
-        ca-certificates \
-        file \
-        make \
-        gcc \
-        autoconf \
-        automake \
-        libtool \
-        m4 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# 安装 Rust 目标
-RUN rustup target add x86_64-unknown-linux-gnu
-
-# 复制依赖文件以利用 Docker 层缓存
-COPY libs/hbb_common /build/libs/hbb_common
-COPY commercial/Cargo.toml /build/commercial/
-COPY commercial/src /build/commercial/src
-COPY commercial/openapi.json /build/commercial/openapi.json
-
-# 构建优化配置
-ENV CARGO_PROFILE_RELEASE_LTO=true \
-    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-    CARGO_PROFILE_RELEASE_STRIP=true \
-    RUSTFLAGS="-C target-cpu=skylake"
-
-# 构建二进制文件
-WORKDIR /build/commercial
-# Cargo.lock 会在构建时重新生成以应用 patch 配置
-# 使用 build-arg 设置构建时环境变量（不在最终镜像中保留）
-ARG RENDEZVOUS_SERVER=""
-ARG RS_PUB_KEY=""
-ARG API_SERVER=""
-RUN rm -f Cargo.lock && \
-    RENDEZVOUS_SERVER="${RENDEZVOUS_SERVER}" \
-    RS_PUB_KEY="${RS_PUB_KEY}" \
-    API_SERVER="${API_SERVER}" \
-    cargo build --release --target x86_64-unknown-linux-gnu
-
-# 清理构建产物
-RUN find target -name "*.a" -delete || true && \
-    find target -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
+# commercial-build.yml 会下载预编译的二进制文件到 rootfs 目录
 
 # ==================== Runtime Stage ====================
 FROM debian:bookworm-slim
-
-# 标签
-LABEL maintainer="RustDesk Team <info@rustdesk.com>" \
-      org.opencontainers.image.title="RustDesk Pro Server" \
-      org.opencontainers.image.description="RustDesk Pro Server Docker Image" \
-      org.opencontainers.image.source="https://github.com/rustdesk/rustdesk-server"
 
 # 安装运行时依赖
 RUN apt-get update && \
@@ -77,34 +16,34 @@ RUN apt-get update && \
     && apt-get clean
 
 # 创建非 root 用户
-RUN groupadd --gid 1000 rustdesk \
-    && useradd --uid 1000 --gid rustdesk --shell /bin/false --create-home rustdesk \
-    && mkdir -p /app/data /app/logs /app/keys \
-    && chown -R rustdesk:rustdesk /app
+RUN useradd -m -s /bin/bash rustdesk
 
-WORKDIR /app
+# 创建目录
+RUN mkdir -p /app/data /app/logs /app/keys && \
+    chown -R rustdesk:rustdesk /app
 
-# 从构建阶段复制二进制文件
-COPY --from=builder /build/commercial/target/x86_64-unknown-linux-gnu/release/rustdesk-pro /app/
+# 复制二进制文件（从 rootfs 目录）
+COPY commercial/docker/rootfs/usr/bin /usr/bin
 
 # 设置权限
-RUN chown rustdesk:rustdesk /app/rustdesk-pro \
-    && chmod +x /app/rustdesk-pro
+RUN chmod -v a+x /usr/bin/*
 
+# 复制证书（如果存在）
+COPY --chown=rustdesk:rustdesk commercial/docker/rootfs/etc/ssl/certs /etc/ssl/certs
+COPY --chown=rustdesk:rustdesk commercial/docker/rootfs/usr/share/ca-certificates /usr/share/ca-certificates
+
+# 切换到非 root 用户
 USER rustdesk
 
-EXPOSE 8080
+# 设置工作目录
+WORKDIR /app
+
+# 暴露端口
+EXPOSE 21114 21115 21116 21117 21118 21119
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:21116/api/version || exit 1
 
-# 环境变量
-ENV SERVER_PORT=8080 \
-    SERVER_HOST=0.0.0.0 \
-    DATABASE_URL=sqlite:./data/rustdesk_pro.db \
-    PRO_DB_URL=./data/rustdesk_pro.db \
-    LOG_LEVEL=info
-
-ENTRYPOINT ["./rustdesk-pro"]
-CMD ["serve"]
+# 启动脚本
+ENTRYPOINT ["/usr/bin/rustdesk-pro"]
