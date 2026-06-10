@@ -79,7 +79,13 @@ jobs:
       - name: Get git tag
         id: vars
         run: |
-          T=${GITHUB_REF#refs/*/}
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            T=${{ github.event.inputs.version }}
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            T=${GITHUB_REF#refs/tags/}
+          else
+            T="dev-${GITHUB_SHA::8}"
+          fi
           M=${T%%.*}
           echo "GIT_TAG=$T" >> $GITHUB_ENV
           echo "MAJOR_TAG=$M" >> $GITHUB_ENV
@@ -117,7 +123,13 @@ jobs:
       - name: Get git tag
         id: vars
         run: |
-          T=${GITHUB_REF#refs/*/}
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            T=${{ github.event.inputs.version }}
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            T=${GITHUB_REF#refs/tags/}
+          else
+            T="dev-${GITHUB_SHA::8}"
+          fi
           M=${T%%.*}
           echo "GIT_TAG=$T" >> $GITHUB_ENV
           echo "MAJOR_TAG=$M" >> $GITHUB_ENV
