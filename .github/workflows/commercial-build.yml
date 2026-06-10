@@ -138,47 +138,6 @@ jobs:
             commercial\target\x86_64-pc-windows-msvc\release\rustdesk-pro.exe
           if-no-files-found: error
 
-  # GitHub (draft) release with all binaries
-  release:
-
-    name: Github release
-    needs: 
-      - build
-      - build-win
-    runs-on: ubuntu-22.04
-    if: startsWith(github.ref, 'refs/tags/')
-    strategy:
-      fail-fast: false
-      matrix:
-        job:
-          - { os: "linux", name: "amd64", suffix: "" }
-          - { os: "linux", name: "arm64v8", suffix: "" }
-          - { os: "linux", name: "armv7", suffix: "" }
-          - { os: "windows", name: "x86_64", suffix: "" }
-          
-    steps:
-
-      - name: Download binaries (${{ matrix.job.os }} - ${{ matrix.job.name }})
-        uses: actions/download-artifact@v5
-        with:
-          name: binaries-${{ matrix.job.os }}-${{ matrix.job.name }}
-          path: ${{ matrix.job.name }}
-
-      - name: Exec chmod
-        run: chmod -v a+x ${{ matrix.job.name }}/*
-
-      - name: Pack files (${{ matrix.job.os }} - ${{ matrix.job.name }})
-        run: |
-          sudo apt update
-          DEBIAN_FRONTEND=noninteractive sudo apt install -y zip
-          zip ${{ matrix.job.name }}/rustdesk-pro-server-${{ matrix.job.os }}-${{ matrix.job.name }}${{ matrix.job.suffix }}.zip ${{ matrix.job.name }}/*
-
-      - name: Create Release (${{ matrix.job.os }} - (${{ matrix.job.name }})
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: ${{ matrix.job.name }}/rustdesk-pro-server-${{ matrix.job.os }}-${{ matrix.job.name }}${{ matrix.job.suffix }}.zip
-            
   # Docker build and push of single-arch images
   docker:
 
@@ -296,7 +255,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Docker Hub manifests
-      # manifest for :pro-1.2.3 tag
       - name: Create and push manifest (Docker Hub :version)
         uses: Noelware/docker-manifest-action@0.4.3
         if: github.event_name != 'workflow_dispatch'
@@ -305,7 +263,6 @@ jobs:
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
 
-      # manifest for :pro-1 tag (major release)
       - name: Create and push manifest (Docker Hub :major)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
@@ -313,7 +270,6 @@ jobs:
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.MAJOR_TAG }}-armv7
           push: true
 
-      # manifest for :latest tag
       - name: Create and push manifest (Docker Hub :latest)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
@@ -322,7 +278,6 @@ jobs:
           push: true
 
       # GHCR manifests
-      # manifest for :pro-1.2.3 tag
       - name: Create and push manifest (GHCR :version)
         uses: Noelware/docker-manifest-action@0.4.3
         if: github.event_name != 'workflow_dispatch'
@@ -331,7 +286,6 @@ jobs:
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
 
-      # manifest for :pro-1 tag (major release)
       - name: Create and push manifest (GHCR :major)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
@@ -339,7 +293,6 @@ jobs:
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.MAJOR_TAG }}-armv7
           push: true
 
-      # manifest for :latest tag
       - name: Create and push manifest (GHCR :latest)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
@@ -386,7 +339,6 @@ jobs:
         run: |
           T=${GITHUB_REF#refs/*/}
           echo "GIT_TAG=$T" >> $GITHUB_ENV
-          # 提取纯版本号（去掉 pro-v 前缀）用于 Debian 包
           VERSION=${T#pro-v}
           VERSION=${VERSION#pro-}
           echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
@@ -396,7 +348,6 @@ jobs:
           mkdir -p debian-package
           cp binaries/* debian-package/
           
-          # Create control file
           mkdir -p debian-package/DEBIAN
           cat > debian-package/DEBIAN/control << EOF
           Package: rustdesk-pro-server
@@ -411,7 +362,6 @@ jobs:
            user management, device management, and audit logging.
           EOF
           
-          # Build package
           fakeroot dpkg-deb --build debian-package rustdesk-pro-server-${{ env.GIT_TAG }}-${{ matrix.job.name }}.deb
 
       - name: Publish Artifacts
@@ -421,31 +371,51 @@ jobs:
           path: rustdesk-pro-server-${{ env.GIT_TAG }}-${{ matrix.job.name }}.deb
           if-no-files-found: error
 
-  # Upload debian packages to release
-  release-deb:
+  # Unified GitHub release with all binaries and debian packages
+  release:
 
-    name: Release debian packages
-    needs: deb-package
+    name: Github release
+    needs: 
+      - build
+      - build-win
+      - deb-package
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
-    strategy:
-      fail-fast: false
-      matrix:
-        job:
-          - { name: "amd64" }
-          - { name: "arm64v8" }
-          - { name: "armv7" }
-
+    
     steps:
 
-      - name: Download debian package
+      - name: Download all artifacts
         uses: actions/download-artifact@v5
         with:
-          name: debian-package-${{ matrix.job.name }}
-          path: .
+          path: artifacts
 
-      - name: Upload to Release
+      - name: Install zip
+        run: |
+          sudo apt update
+          DEBIAN_FRONTEND=noninteractive sudo apt install -y zip
+
+      - name: Pack Linux binaries
+        run: |
+          for arch in amd64 arm64v8 armv7; do
+            mkdir -p release
+            cp artifacts/binaries-linux-$arch/rustdesk-pro release/rustdesk-pro-$arch
+            chmod +x release/rustdesk-pro-$arch
+            zip release/rustdesk-pro-server-linux-$arch.zip release/rustdesk-pro-$arch
+          done
+
+      - name: Pack Windows binaries
+        run: |
+          cp artifacts/binaries-windows-x86_64/rustdesk-pro.exe release/
+          zip release/rustdesk-pro-server-windows-x86_64.zip release/rustdesk-pro.exe
+
+      - name: Copy debian packages
+        run: |
+          cp artifacts/debian-package-*/rustdesk-pro-server-*.deb release/ 2>/dev/null || true
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: rustdesk-pro-server-*.deb
+          files: |
+            release/*.zip
+            release/*.deb
