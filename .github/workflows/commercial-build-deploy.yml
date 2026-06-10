@@ -333,17 +333,17 @@ jobs:
           cp binaries/* debian-package/
           
           mkdir -p debian-package/DEBIAN
-          # Create control file for Debian package (line by line)
-          echo "Package: rustdesk-pro-server" > debian-package/DEBIAN/control
-          echo "Version: ${{ needs.pre-build.outputs.deb_version }}" >> debian-package/DEBIAN/control
-          echo "Section: net" >> debian-package/DEBIAN/control
-          echo "Priority: optional" >> debian-package/DEBIAN/control
-          echo "Architecture: ${{ matrix.job.debian_platform }}" >> debian-package/DEBIAN/control
-          echo "Maintainer: RustDesk Team <info@rustdesk.com>" >> debian-package/DEBIAN/control
-          echo "Description: RustDesk Pro Server - Enterprise Remote Control Solution" >> debian-package/DEBIAN/control
-          echo " RustDesk Pro Server is the commercial edition of RustDesk Server," >> debian-package/DEBIAN/control
-          echo " providing enterprise-grade features including license management," >> debian-package/DEBIAN/control
-          echo " user management, device management, and audit logging." >> debian-package/DEBIAN/control
+          # Create Debian control file
+          printf '%s\n' \
+            "Package: rustdesk-pro-server" \
+            "Version: ${{ needs.pre-build.outputs.deb_version }}" \
+            "Section: net" \
+            "Priority: optional" \
+            "Architecture: ${{ matrix.job.debian_platform }}" \
+            "Maintainer: RustDesk Team <info@rustdesk.com>" \
+            "Description: RustDesk Pro Server - Enterprise Remote Control Solution" \
+            " RustDesk Pro Server is the commercial edition of RustDesk Server, providing enterprise-grade features including license management, user management, device management, and audit logging." \
+            > debian-package/DEBIAN/control
           
           fakeroot dpkg-deb --build debian-package rustdesk-pro-server-${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}.deb
       
