@@ -502,9 +502,9 @@ jobs:
           provenance: false
           tags: |
             ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
-            ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
             ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
-            ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
       
       - name: ✅ Verify push
         run: |
@@ -547,8 +547,8 @@ jobs:
       - name: 📦 Docker Hub manifests
         uses: Noelware/docker-manifest-action@0.4.3
         with:
-          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}
-          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-armv7
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
       - name: 📦 Docker Hub latest manifest
@@ -561,8 +561,8 @@ jobs:
       - name: 📦 GHCR manifests
         uses: Noelware/docker-manifest-action@0.4.3
         with:
-          base-image: ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}
-          extra-images: ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-amd64,${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-armv7
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
       - name: 📦 GHCR latest manifest
