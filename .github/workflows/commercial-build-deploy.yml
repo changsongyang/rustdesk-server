@@ -912,12 +912,16 @@ jobs:
           
           # 检查是否有失败的任务
           FAILED=""
-          for job in ci-status-check pre-build build-linux build-windows build-summary deb-package github-release docker-build docker-manifest deploy-summary; do
-            result="${{ needs[$job].result }}"
-            if [ "$result" == "failure" ]; then
-              FAILED="$FAILED $job"
-            fi
-          done
+          if [ "${{ needs.ci-status-check.result }}" == "failure" ]; then FAILED="$FAILED ci-status-check"; fi
+          if [ "${{ needs.pre-build.result }}" == "failure" ]; then FAILED="$FAILED pre-build"; fi
+          if [ "${{ needs.build-linux.result }}" == "failure" ]; then FAILED="$FAILED build-linux"; fi
+          if [ "${{ needs.build-windows.result }}" == "failure" ]; then FAILED="$FAILED build-windows"; fi
+          if [ "${{ needs.build-summary.result }}" == "failure" ]; then FAILED="$FAILED build-summary"; fi
+          if [ "${{ needs.deb-package.result }}" == "failure" ]; then FAILED="$FAILED deb-package"; fi
+          if [ "${{ needs.github-release.result }}" == "failure" ]; then FAILED="$FAILED github-release"; fi
+          if [ "${{ needs.docker-build.result }}" == "failure" ]; then FAILED="$FAILED docker-build"; fi
+          if [ "${{ needs.docker-manifest.result }}" == "failure" ]; then FAILED="$FAILED docker-manifest"; fi
+          if [ "${{ needs.deploy-summary.result }}" == "failure" ]; then FAILED="$FAILED deploy-summary"; fi
 
           if [ "$FAILED" != "" ]; then
             echo "❌ Failed jobs: $FAILED"
