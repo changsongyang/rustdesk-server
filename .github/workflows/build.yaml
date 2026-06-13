@@ -8,7 +8,7 @@ name: build
 # DOCKER_HUB_PASSWORD is a token you should create under "account settings / security" with read/write access
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 on:
@@ -46,26 +46,21 @@ jobs:
     steps:
       
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
-          override: true
-          default: true
+          targets: ${{ matrix.job.target }}
           components: rustfmt
-          profile: minimal
-          target: ${{ matrix.job.target }}
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features --target=${{ matrix.job.target }}
-          use-cross: true  
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross build --release --all-features --target=${{ matrix.job.target }}
 
       - name: Exec chmod
         run: chmod -v a+x target/${{ matrix.job.target }}/release/*
@@ -87,26 +82,19 @@ jobs:
     steps:
       
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
-          override: true
-          default: true
+          targets: x86_64-pc-windows-msvc
           components: rustfmt
-          profile: minimal
-          target: x86_64-pc-windows-msvc
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features --target=x86_64-pc-windows-msvc
-          use-cross: true
+        run: cargo build --release --all-features --target=x86_64-pc-windows-msvc
 
       - name: Install NSIS
         run: |
@@ -117,7 +105,7 @@ jobs:
           scoop install nsis
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 16
 
@@ -171,7 +159,7 @@ jobs:
             ui\SignOutput\RustDeskServer.Setup.exe
           if-no-files-found: error
 
-  # github (draft) release with all binaries
+  # github (draft) release with all binaries
   release:
 
     name: Github release
@@ -179,6 +167,8 @@ jobs:
       - build
       - build-win
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write  # Required for creating releases and uploading assets
     strategy:
       fail-fast: false
       matrix:
@@ -231,7 +221,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
         
@@ -399,7 +389,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
         
@@ -553,6 +543,8 @@ jobs:
     name: debian package - ${{ matrix.job.name }}
     needs: build
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write  # Required for uploading release assets
     strategy:
       fail-fast: false
       matrix:
@@ -565,7 +557,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
