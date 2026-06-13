@@ -715,11 +715,11 @@ jobs:
           retention-days: 90
       
       - name: ✍️ Sign Docker image
-        if: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
+        if: ${{ secrets.COSIGN_PRIVATE_KEY }}
         uses: sigstore/cosign-installer@v3
       
       - name: Sign and push Docker image
-        if: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
+        if: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
           cosign sign --yes ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
           cosign sign --yes ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
