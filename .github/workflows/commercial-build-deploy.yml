@@ -118,15 +118,19 @@ jobs:
         run: echo "✅ CI status verified - Proceeding to build phase"
 
   # ==================== 阶段 1: 构建准备 ====================
+  # 功能: 统一版本号管理和部署条件判断
+  # 输入: github.ref, inputs.version
+  # 输出: git_tag, should_deploy, build_id
   pre-build:
-    name: 📋 P1 - Pre-Build Preparation
+    name: P1 - Pre-Build
     needs: ci-status-check
-    if: ${{ always() && (needs.ci-status-check.outputs.ci_passed == 'true' || needs.ci-status-check.result == 'skipped') }}
+    if: always()
     runs-on: ubuntu-22.04
     outputs:
       build_id: ${{ steps.build-id.outputs.build_id }}
       git_tag: ${{ steps.vars.outputs.git_tag }}
       deb_version: ${{ steps.vars.outputs.deb_version }}
+      should_deploy: ${{ steps.deploy-check.outputs.should_deploy }}
       ci_status: ${{ needs.ci-status-check.outputs.ci_passed || 'skipped' }}
     
     steps:
@@ -136,14 +140,14 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       
-      - name: 📝 Generate Build ID
+      - name: Generate Build ID
         id: build-id
         run: |
           BUILD_ID=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::8}
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
       
-      - name: 📌 Extract version information
+      - name: Extract version information
         id: vars
         run: |
           if [ "${{ github.event.inputs.version }}" != "" ]; then
@@ -162,7 +166,20 @@ jobs:
           echo "deb_version=$VERSION" >> $GITHUB_OUTPUT
           echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
       
-      - name: 📊 Build Information
+      - name: Determine deployment status
+        id: deploy-check
+        run: |
+          # 统一判断是否需要部署
+          # 条件: push tag (pro-v*/pro-*) 或 手动输入version
+          if [[ "${{ github.ref }}" == refs/tags/pro-* ]] || [[ "${{ github.event.inputs.version }}" != "" ]]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "Deployment: ENABLED"
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "Deployment: DISABLED (push main without tag)"
+          fi
+      
+      - name: Build Information
         run: |
           echo "=============================================="
           echo "         Build Configuration Summary          "
@@ -172,13 +189,16 @@ jobs:
           echo "Deb Version:   $DEB_VERSION"
           echo "Trigger:       ${{ github.event_name }}"
           echo "Ref:           ${{ github.ref }}"
+          echo "Deploy:        ${{ steps.deploy-check.outputs.should_deploy }}"
           echo "=============================================="
 
   # ==================== 阶段 2: 并行构建 ====================
+  # 功能: Linux多架构并行构建
+  # 依赖: pre-build
+  # 并行: amd64, arm64v8, armv7 (最多5个并行)
   build-linux:
-    name: 🔧 P2 - Build Linux - ${{ matrix.job.name }}
+    name: P2 - Build Linux (${{ matrix.job.name }})
     needs: pre-build
-    if: ${{ always() && needs.pre-build.result == 'success' }}
     runs-on: ubuntu-22.04
     outputs:
       status: ${{ steps.build-status.outputs.status }}
@@ -275,10 +295,12 @@ jobs:
           echo "=============================================="
 
   # Windows build (并行执行)
+  # 功能: Windows x86_64构建
+  # 依赖: pre-build
+  # 并行: 与build-linux并行执行
   build-windows:
-    name: 🔧 P2 - Build Windows
+    name: P2 - Build Windows
     needs: pre-build
-    if: ${{ always() && needs.pre-build.result == 'success' }}
     runs-on: windows-2022
     outputs:
       status: ${{ steps.build-status.outputs.status }}
@@ -427,13 +449,17 @@ jobs:
           echo "=============================================="
 
   # ==================== 阶段 4: 打包（Debian 包） ====================
+  # 功能: Debian包构建（多架构并行）
+  # 依赖: pre-build, build-summary
+  # 并行: amd64, arm64v8, armv7 (最多5个并行)
+  # 条件: should_deploy == 'true' && build_status == 'success'
   deb-package:
-    name: 📦 P4 - Debian Package - ${{ matrix.job.name }}
+    name: P4 - Debian Package (${{ matrix.job.name }})
     needs: 
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: ${{ (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') && needs.build-summary.outputs.build_status == 'success' }}
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
     outputs:
       status: ${{ steps.package-status.outputs.status }}
     strategy:
@@ -521,13 +547,17 @@ jobs:
           echo "=============================================="
 
   # ==================== 阶段 5: GitHub Release ====================
+  # 功能: GitHub Release发布
+  # 依赖: build-summary, deb-package
+  # 条件: should_deploy == 'true' && build_status == 'success'
   github-release:
-    name: 🚀 P5 - GitHub Release
+    name: P5 - GitHub Release
     needs: 
+      - pre-build
       - build-summary
       - deb-package
     runs-on: ubuntu-22.04
-    if: ${{ (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') && needs.build-summary.outputs.build_status == 'success' }}
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
     outputs:
       status: ${{ steps.release-status.outputs.status }}
     
@@ -591,13 +621,16 @@ jobs:
           echo "=============================================="
 
   # ==================== 阶段 6: Docker 镜像构建与推送 ====================
+  # 功能: Docker镜像构建（多架构并行）
+  # 依赖: pre-build, build-summary
+  # 并行: amd64, arm64v8, armv7 (最多5个并行)
+  # 条件: should_deploy == 'true' && build_status == 'success'
   docker-build:
-    name: 🐳 P6 - Docker Build - ${{ matrix.job.name }}
+    name: P6 - Docker Build (${{ matrix.job.name }})
     needs: 
       - pre-build
       - build-summary
-    if: ${{ (!github.event.inputs.skip-deploy && needs.build-summary.outputs.build_status == 'success') && (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') }}
-    runs-on: ubuntu-latest
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
     strategy:
@@ -738,11 +771,16 @@ jobs:
           echo "=============================================="
 
   # ==================== 阶段 7: Docker Manifest ====================
+  # 功能: Docker多架构Manifest创建
+  # 依赖: docker-build
+  # 条件: should_deploy == 'true'
   docker-manifest:
-    name: 📦 P7 - Docker Manifest
-    needs: docker-build
+    name: P7 - Docker Manifest
+    needs: 
+      - pre-build
+      - docker-build
     runs-on: ubuntu-latest
-    if: ${{ (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') && !github.event.inputs.skip-deploy }}
+    if: needs.pre-build.outputs.should_deploy == 'true'
     outputs:
       status: ${{ steps.manifest-status.outputs.status }}
     
@@ -828,14 +866,17 @@ jobs:
           echo "🚀 Deployment completed successfully!"
 
   # ==================== 阶段 8: 部署汇总 ====================
+  # 功能: 部署结果汇总和审计记录
+  # 依赖: pre-build, github-release, docker-manifest
+  # 条件: should_deploy == 'true'
   deploy-summary:
-    name: 📊 P8 - Deployment Summary
+    name: P8 - Deployment Summary
     needs: 
       - pre-build
       - github-release
       - docker-manifest
     runs-on: ubuntu-22.04
-    if: ${{ (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') && !github.event.inputs.skip-deploy && needs.pre-build.result == 'success' }}
+    if: always() && needs.pre-build.outputs.should_deploy == 'true'
     
     steps:
       - name: 📊 Deployment Summary Report
