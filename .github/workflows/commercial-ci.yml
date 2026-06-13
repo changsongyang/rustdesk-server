@@ -3,6 +3,21 @@ name: CI
 # RustDesk Pro Server - 持续集成工作流
 # 职责：代码质量检查、编译验证、单元测试
 # 触发时机：push 到 main/develop 分支、pull request
+#
+# 任务优先级顺序：
+#   P1 (最高) - fmt: 代码格式化检查
+#   P2        - clippy: 静态分析检查
+#   P3        - test: 单元测试
+#   P4        - build: 编译验证（并行执行，最多5个并行任务）
+#   P5 (汇总) - summary: 综合检查汇总
+#
+# 并行执行策略：
+#   - fmt、clippy、test 可并行执行（无依赖关系）
+#   - build 最多并行5个目标（节省资源）
+#   - summary 依赖所有前置任务完成
+#
+# 失败阻断机制：
+#   - 任一任务失败 → summary 失败 → 阻断后续 CD 流程
 
 on:
   push:
@@ -16,10 +31,13 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # 代码格式化检查
+  # ==================== P1: 代码格式化检查 ====================
   fmt:
-    name: Rustfmt
+    name: 🔍 P1 - Rustfmt
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.fmt-status.outputs.status }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -34,11 +52,28 @@ jobs:
       
       - name: Check formatting
         run: cargo fmt --manifest-path commercial/Cargo.toml -- --check
+      
+      - name: 📊 Report fmt status
+        id: fmt-status
+        run: |
+          echo "✅ Formatting check passed"
+          echo "status=success" >> $GITHUB_OUTPUT
+      
+      - name: 🎉 P1 Complete
+        if: success()
+        run: echo "✅ P1 - Rustfmt: PASSED"
+      
+      - name: ❌ P1 Failed
+        if: failure()
+        run: echo "❌ P1 - Rustfmt: FAILED - Blocking downstream tasks"
 
-  # 静态分析检查
+  # ==================== P2: 静态分析检查 ====================
   clippy:
-    name: Clippy
+    name: 🔍 P2 - Clippy
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.clippy-status.outputs.status }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -58,11 +93,28 @@ jobs:
         run: cargo clippy --manifest-path commercial/Cargo.toml --all-targets --no-deps -- -D warnings
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+      
+      - name: 📊 Report clippy status
+        id: clippy-status
+        run: |
+          echo "✅ Clippy check passed"
+          echo "status=success" >> $GITHUB_OUTPUT
+      
+      - name: 🎉 P2 Complete
+        if: success()
+        run: echo "✅ P2 - Clippy: PASSED"
+      
+      - name: ❌ P2 Failed
+        if: failure()
+        run: echo "❌ P2 - Clippy: FAILED - Blocking downstream tasks"
 
-  # 单元测试
+  # ==================== P3: 单元测试 ====================
   test:
-    name: Test Suite
+    name: 🧪 P3 - Test Suite
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.test-status.outputs.status }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -81,13 +133,30 @@ jobs:
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           DATABASE_URL: "sqlite::memory:"
+      
+      - name: 📊 Report test status
+        id: test-status
+        run: |
+          echo "✅ Test suite passed"
+          echo "status=success" >> $GITHUB_OUTPUT
+      
+      - name: 🎉 P3 Complete
+        if: success()
+        run: echo "✅ P3 - Test Suite: PASSED"
+      
+      - name: ❌ P3 Failed
+        if: failure()
+        run: echo "❌ P3 - Test Suite: FAILED - Blocking downstream tasks"
 
-  # 编译验证
+  # ==================== P4: 编译验证（并行执行，最多5个） ====================
   build:
-    name: Build Validation (${{ matrix.target }})
+    name: 🔨 P4 - Build Validation (${{ matrix.target }})
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.build-status.outputs.status }}
     strategy:
       fail-fast: false
+      max-parallel: 5  # 限制并行任务数量，节省资源
       matrix:
         target:
           - x86_64-unknown-linux-gnu
@@ -120,21 +189,84 @@ jobs:
         run: cargo build --manifest-path commercial/Cargo.toml --release --target ${{ matrix.target }}
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+      
+      - name: 📊 Report build status
+        id: build-status
+        run: |
+          echo "✅ Build validation passed for ${{ matrix.target }}"
+          echo "status=success" >> $GITHUB_OUTPUT
+      
+      - name: 🎉 P4 Complete
+        if: success()
+        run: echo "✅ P4 - Build Validation (${{ matrix.target }}): PASSED"
+      
+      - name: ❌ P4 Failed
+        if: failure()
+        run: echo "❌ P4 - Build Validation (${{ matrix.target }}): FAILED"
 
-  # 综合检查汇总
+  # ==================== P5: 综合检查汇总 ====================
   summary:
-    name: CI Summary
+    name: 📋 P5 - CI Summary
     needs: [fmt, clippy, test, build]
     runs-on: ubuntu-latest
+    outputs:
+      ci_status: ${{ steps.final-status.outputs.ci_status }}
+      all_passed: ${{ steps.final-status.outputs.all_passed }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
       
-      - name: Report CI status
+      - name: 📊 Collect task statuses
+        id: collect-status
         run: |
+          echo "=============================================="
+          echo "         CI Pipeline Status Report            "
+          echo "=============================================="
+          echo "P1 - Rustfmt:      ${{ needs.fmt.outputs.status || 'unknown' }}"
+          echo "P2 - Clippy:       ${{ needs.clippy.outputs.status || 'unknown' }}"
+          echo "P3 - Test Suite:   ${{ needs.test.outputs.status || 'unknown' }}"
+          echo "P4 - Build:        ${{ needs.build.outputs.status || 'unknown' }}"
+          echo "=============================================="
+      
+      - name: ✅ Determine final CI status
+        id: final-status
+        run: |
+          if [ "${{ needs.fmt.result }}" == "success" ] && \
+             [ "${{ needs.clippy.result }}" == "success" ] && \
+             [ "${{ needs.test.result }}" == "success" ] && \
+             [ "${{ needs.build.result }}" == "success" ]; then
+            echo "ci_status=success" >> $GITHUB_OUTPUT
+            echo "all_passed=true" >> $GITHUB_OUTPUT
+            echo "✅ All CI checks passed - Ready for CD pipeline"
+          else
+            echo "ci_status=failed" >> $GITHUB_OUTPUT
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "❌ CI checks failed - Blocking CD pipeline"
+          fi
+      
+      - name: 🎉 CI Pipeline Complete
+        if: success()
+        run: |
+          echo "=============================================="
+          echo "         CI Pipeline Completed Successfully   "
+          echo "=============================================="
           echo "✅ All CI checks passed!"
           echo "📊 Summary:"
-          echo "- Formatting: PASSED"
-          echo "- Static Analysis: PASSED"
-          echo "- Unit Tests: PASSED"
-          echo "- Build Validation: PASSED"
+          echo "- P1 Formatting: PASSED"
+          echo "- P2 Static Analysis: PASSED"
+          echo "- P3 Unit Tests: PASSED"
+          echo "- P4 Build Validation: PASSED"
+          echo "=============================================="
+          echo "🚀 Ready to proceed to Build & Deploy pipeline"
+      
+      - name: ❌ CI Pipeline Failed
+        if: failure()
+        run: |
+          echo "=============================================="
+          echo "         CI Pipeline Failed                   "
+          echo "=============================================="
+          echo "❌ One or more CI checks failed"
+          echo "🚫 CD pipeline execution blocked"
+          echo "=============================================="
+          exit 1
