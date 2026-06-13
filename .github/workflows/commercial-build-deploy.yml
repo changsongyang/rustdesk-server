@@ -593,7 +593,9 @@ jobs:
   # ==================== 阶段 6: Docker 镜像构建与推送 ====================
   docker-build:
     name: 🐳 P6 - Docker Build - ${{ matrix.job.name }}
-    needs: build-summary
+    needs: 
+      - pre-build
+      - build-summary
     if: ${{ (!github.event.inputs.skip-deploy && needs.build-summary.outputs.build_status == 'success') && (startsWith(github.ref, 'refs/tags/') || github.event.inputs.version != '') }}
     runs-on: ubuntu-latest
     outputs:
