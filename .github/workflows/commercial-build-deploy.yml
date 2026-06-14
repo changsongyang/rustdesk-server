@@ -628,6 +628,7 @@ jobs:
       - pre-build
       - build-summary
     if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
+    runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
     strategy:
