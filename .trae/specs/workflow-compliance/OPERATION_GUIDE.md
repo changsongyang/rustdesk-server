@@ -1,4 +1,4 @@
-# RustDesk Workflow 合规化规范操作指南
+# RustDesk Pro Server 商业版构建部署文档
 
 ## 目录
 1. [概述](#概述)
@@ -16,11 +16,10 @@
 
 ### 1.1 目的
 
-本文档旨在为RustDesk项目的CI/CD工作流提供一套标准化的合规管理方案，确保所有构建、打包和部署流程符合公司安全合规要求。
+本文档旨在为RustDesk Pro Server商业版提供完整的构建部署指南，确保所有构建、打包和部署流程符合公司安全合规要求。
 
 ### 1.2 适用范围
 
-- RustDesk Server 社区版
 - RustDesk Pro Server 商业版
 
 ### 1.3 文档版本
@@ -28,6 +27,7 @@
 | 版本 | 日期 | 修改说明 |
 |------|------|---------|
 | 1.0 | 2026-06-13 | 初始版本 |
+| 2.0 | 2026-06-14 | 更新触发机制、任务结构、注释规范 |
 
 ---
 
@@ -37,9 +37,8 @@
 
 ```
 .github/workflows/
-├── build.yaml              # 社区版构建工作流
-├── commercial-ci.yml       # 商业版CI工作流
-└── commercial-build-deploy.yml  # 商业版CD工作流
+├── commercial-ci.yml       # 商业版CI工作流（代码检查、单元测试）
+└── commercial-build-deploy.yml  # 商业版CD工作流（构建、打包、部署）
 ```
 
 ### 2.2 任务执行顺序
@@ -50,26 +49,39 @@
 ├─────────────────────────────────────────────────────────────────┤
 │  P1: Rustfmt → P2: Clippy → P3: Test → P4: Build → P5: Summary │
 └─────────────────────────────────────────────────────────────────┘
-                              ↓ (workflow_run)
+                              ↓ (独立触发)
 ┌─────────────────────────────────────────────────────────────────┐
 │                   CD Pipeline (commercial-build-deploy.yml)     │
 ├─────────────────────────────────────────────────────────────────┤
-│  P0: CI Check → P1: Pre-Build → P2: Build → P3: Summary        │
+│  P1: Pre-Build → P2: Build (Linux/Windows并行) → P3: Summary   │
 │  → P4: Package → P5: Release → P6: Docker → P7: Manifest       │
+│  → P8: Deploy Summary                                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+**注意**: CI和CD工作流独立触发，不再通过workflow_run自动触发。
+
 ### 2.3 任务优先级
 
-| 优先级 | 任务 | 说明 |
-|-------|------|------|
-| P1 | pre-build | 构建准备和版本信息 |
-| P2 | build-linux/build-windows | 并行构建（最多5个并行） |
-| P3 | build-summary | 构建结果验证 |
-| P4 | deb-package | Debian包构建 |
-| P5 | github-release | GitHub Release发布 |
-| P6 | docker-build | Docker镜像构建（最多5个并行） |
-| P7 | docker-manifest | Docker Manifest创建 |
+| 优先级 | 任务 | 说明 | 并行 |
+|-------|------|------|------|
+| P1 | pre-build | 构建准备、版本管理、部署条件判断 | - |
+| P2 | build-linux | Linux多架构并行构建 | 3架构并行 |
+| P2 | build-windows | Windows构建 | 与Linux并行 |
+| P3 | build-summary | 构建结果验证 | - |
+| P4 | deb-package | Debian包构建（多架构） | 3架构并行 |
+| P5 | github-release | GitHub Release发布 | - |
+| P6 | docker-build | Docker镜像构建（多架构） | 3架构并行 |
+| P7 | docker-manifest | Docker Manifest创建 | - |
+| P8 | deploy-summary | 部署结果汇总、审计记录 | - |
+
+### 2.4 并行执行策略
+
+| 阶段 | 并行任务 | 最大并行数 | 预计时间 |
+|------|---------|-----------|---------|
+| P2 - Build | build-linux(3), build-windows(1) | 5 | 30分钟 |
+| P4 - Package | deb-package(3) | 5 | 5分钟 |
+| P6 - Deploy | docker-build(3) | 5 | 10分钟 |
 
 ---
 
@@ -80,34 +92,32 @@
 #### 3.1.1 push触发
 
 **触发条件**：
-- 推送到`main`分支
-- 推送符合`pro-v*`或`pro-*`模式的标签
+- 推送到`main`分支（仅执行构建，不部署）
+- 推送符合`pro-v*`或`pro-*`模式的标签（完整流程）
 
-**配置位置**：[commercial-build-deploy.yml 第48-52行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L48-L52)
-
-```yaml
-push:
-  branches: [main]
-  tags:
-    - 'pro-v*'
-    - 'pro-*'
-```
-
-#### 3.1.2 workflow_run触发
-
-**触发条件**：
-- `CI`工作流成功完成
-- 分支为`main`
-
-**配置位置**：[commercial-build-deploy.yml 第40-45行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L40-L45)
+**配置位置**：[commercial-build-deploy.yml 第43-49行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L43-L49)
 
 ```yaml
-workflow_run:
-  workflows: ["CI"]
-  types:
-    - completed
-  branches: [main]
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'pro-v*'
+      - 'pro-*'
 ```
+
+#### 3.1.2 触发行为矩阵
+
+| 触发方式 | pre-build | build-linux | build-windows | deb-package | docker-build | deploy-summary |
+|---------|------------|-------------|---------------|-------------|--------------|----------------|
+| **push main** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **push pro-v\*** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **手动触发(无version)** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **手动触发(pro-v1.0.0)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**说明**：
+- `should_deploy=false` 时，仅执行构建阶段（P1-P3）
+- `should_deploy=true` 时，执行完整流程（P1-P8）
 
 ### 3.2 手动触发
 
@@ -115,21 +125,44 @@ workflow_run:
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| version | string | 否 | 版本号（如pro-v1.0.0） |
-| skip-ci-check | boolean | 否 | 跳过CI状态检查（仅用于紧急发布） |
-| skip-deploy | boolean | 否 | 跳过部署阶段 |
+| version | string | 否 | 版本号（如pro-v1.0.0），填写后触发完整部署流程 |
 
-**配置位置**：[commercial-build-deploy.yml 第54-68行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L54-L68)
+**配置位置**：[commercial-build-deploy.yml 第51-57行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L51-L57)
 
-### 3.3 触发条件矩阵
+```yaml
+workflow_dispatch:
+  inputs:
+    version:
+      description: '版本号 (e.g., pro-v1.0.0)'
+      required: false
+      type: string
+```
 
-| 触发方式 | 代码检查 | 单元测试 | Docker构建 | 说明 |
-|---------|---------|---------|-----------|------|
-| push tag (pro-v*) | ✅ | ✅ | ✅ | 完整流程 |
-| push main | ✅ | ✅ | ❌ | 仅CI |
-| workflow_run | ✅ | ✅ | ✅ | 依赖CI结果 |
-| 手动触发(无version) | ✅ | ✅ | ❌ | 跳过Docker |
-| 手动触发(pro-v1.0.0) | ✅ | ✅ | ✅ | 完整流程 |
+#### 3.2.2 手动触发示例
+
+```bash
+# 仅执行构建（不填写version）
+gh workflow run commercial-build-deploy.yml --repo changsongyang/rustdesk-server
+
+# 执行完整部署流程（填写version）
+gh workflow run commercial-build-deploy.yml \
+  --repo changsongyang/rustdesk-server \
+  -f version="pro-v1.0.0"
+```
+
+### 3.3 部署条件判断逻辑
+
+**位置**：[commercial-build-deploy.yml 第119-130行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L119-L130)
+
+```bash
+# 判断是否需要部署
+# 条件: push tag (pro-v*/pro-*) 或 手动输入version
+if [[ "${{ github.ref }}" == refs/tags/pro-* ]] || [[ "${{ github.event.inputs.version }}" != "" ]]; then
+  echo "should_deploy=true" >> $GITHUB_OUTPUT
+else
+  echo "should_deploy=false" >> $GITHUB_OUTPUT
+fi
+```
 
 ---
 
@@ -167,27 +200,14 @@ workflow_run:
   - GitHub Release: pro-v1.0.0
 ```
 
-### 4.4 统一版本号配置
+### 4.4 pre-build输出参数
 
-所有Docker相关job必须使用`pre-build`输出的版本号：
-
-```yaml
-# ✅ 正确做法
-- name: Set version variables from pre-build
-  run: |
-    echo "GIT_TAG=${{ needs.pre-build.outputs.git_tag }}" >> $GITHUB_ENV
-
-# ❌ 错误做法
-- name: Set version variables
-  run: |
-    if [ "${{ github.event.inputs.version }}" != "" ]; then
-      T=${{ github.event.inputs.version }}
-    elif [ "${{ github.ref_type }}" = "tag" ]; then
-      T=${GITHUB_REF#refs/tags/}
-    else
-      T="dev-${GITHUB_SHA::8}"
-    fi
-```
+| 输出参数 | 说明 | 示例 |
+|---------|------|------|
+| build_id | 构建ID（时间戳+短SHA） | 20260614-143022-a1b2c3d4 |
+| git_tag | Git标签 | pro-v1.0.0 |
+| deb_version | Debian版本号 | 1.0.0 |
+| should_deploy | 是否需要部署 | true/false |
 
 ---
 
@@ -201,16 +221,17 @@ workflow_run:
 ```
 ycstech/rustdesk-pro-server:pro-v1.0.0-amd64
 ycstech/rustdesk-pro-server:pro-v1.0.0-arm64v8
+ycstech/rustdesk-pro-server:pro-v1.0.0-armv7
 ycstech/rustdesk-pro-server:latest-amd64
 ```
 
 ### 5.2 支持的架构
 
-| 架构 | Docker平台标识 | 说明 |
-|------|--------------|------|
-| amd64 | linux/amd64 | x86_64 |
-| arm64v8 | linux/arm64 | ARM 64-bit |
-| armv7 | linux/arm/v7 | ARM 32-bit |
+| 架构 | Docker平台标识 | Rust目标 | 说明 |
+|------|--------------|---------|------|
+| amd64 | linux/amd64 | x86_64-unknown-linux-musl | x86_64 |
+| arm64v8 | linux/arm64 | aarch64-unknown-linux-musl | ARM 64-bit |
+| armv7 | linux/arm/v7 | armv7-unknown-linux-musleabihf | ARM 32-bit |
 
 ### 5.3 镜像仓库配置
 
@@ -219,26 +240,20 @@ ycstech/rustdesk-pro-server:latest-amd64
 | Docker Hub | `ycstech/rustdesk-pro-server` | 主镜像仓库 |
 | GHCR | `ghcr.io/changsongyang/rustdesk-pro-server` | GitHub容器仓库 |
 
-### 5.4 镜像构建配置
+### 5.4 镜像构建流程
 
-**配置位置**：[commercial-build-deploy.yml 第656-672行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L656-L672)
-
-```yaml
-- name: 🐳 Build and push Docker image
-  uses: docker/build-push-action@v5
-  with:
-    context: .
-    file: ./commercial/docker/Dockerfile.gha
-    platforms: ${{ matrix.job.docker_platform }}
-    push: true
-    provenance: false
-    cache-from: type=gha
-    cache-to: type=gha,mode=max
-    tags: |
-      ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
-      ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
-      ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
-      ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
+```
+docker-build (P6)
+    ↓
+构建单架构镜像
+    ↓
+推送到 Docker Hub 和 GHCR
+    ↓
+docker-manifest (P7)
+    ↓
+创建多架构 Manifest
+    ↓
+推送 Manifest 到两个仓库
 ```
 
 ---
@@ -247,49 +262,20 @@ ycstech/rustdesk-pro-server:latest-amd64
 
 ### 6.1 安全扫描工具
 
-| 工具 | 用途 | 配置位置 |
-|------|------|---------|
-| Trivy | 漏洞扫描 | [commercial-build-deploy.yml 第681-688行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L681-L688) |
-| SBOM | 软件物料清单 | [commercial-build-deploy.yml 第697-702行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L697-L702) |
-| Cosign | 镜像签名 | [commercial-build-deploy.yml 第711-717行](file:///c:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/commercial-build-deploy.yml#L711-L717) |
+| 工具 | 用途 | 说明 |
+|------|------|------|
+| Trivy | 漏洞扫描 | 扫描CRITICAL和HIGH级别漏洞 |
+| SBOM | 软件物料清单 | SPDX格式 |
+| Cosign | 镜像签名 | 可选配置 |
 
 ### 6.2 漏洞扫描配置
 
-```yaml
-- name: 🔍 Scan Docker image for vulnerabilities
-  uses: aquasecurity/trivy-action@master
-  with:
-    image-ref: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}'
-    format: 'sarif'
-    output: 'trivy-results.sarif'
-    severity: 'CRITICAL,HIGH'
-    exit-code: '0'  # 仅报告，不阻止构建
-```
+**配置**：
+- 扫描级别: CRITICAL, HIGH
+- 输出格式: SARIF
+- exit-code: 0（仅报告，不阻止构建）
 
-### 6.3 SBOM生成配置
-
-```yaml
-- name: 📝 Generate SBOM for Docker image
-  uses: anchore/sbom-action@v0
-  with:
-    image: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}'
-    format: spdx-json
-    output-file: 'sbom-${{ matrix.job.name }}.spdx.json'
-```
-
-### 6.4 镜像签名配置
-
-```yaml
-- name: ✍️ Sign Docker image
-  uses: sigstore/cosign-installer@v3
-
-- name: Sign and push Docker image
-  run: |
-    cosign sign --yes ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
-    cosign sign --yes ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
-```
-
-### 6.5 安全扫描阈值
+### 6.3 安全扫描阈值
 
 | 级别 | 当前配置 | 建议配置 |
 |------|---------|---------|
@@ -310,9 +296,10 @@ ycstech/rustdesk-pro-server:latest-amd64
 |------|------|------|
 | triggered_by | github.actor | 触发人 |
 | event_type | github.event_name | 事件类型 |
-| trigger_time | github.event.created_at | 触发时间 |
+| trigger_time | date -u | 触发时间 |
 | git_ref | github.ref | Git引用 |
 | git_sha | github.sha | Git提交SHA |
+| run_id | github.run_id | 运行ID |
 
 ### 7.2 审计日志示例
 
@@ -320,31 +307,23 @@ ycstech/rustdesk-pro-server:latest-amd64
 ==============================================
            DEPLOYMENT SUMMARY
 ==============================================
-Build ID:      20260613-143022-a1b2c3d4
+Build ID:      20260614-143022-a1b2c3d4
 Version:       pro-v1.0.0
 Environment:   Production
 ----------------------------------------------
-📝 AUDIT INFORMATION:
+AUDIT INFORMATION:
    Triggered by:   changsongyang
    Event Type:     push
-   Trigger Time:   2026-06-13T14:30:22Z
+   Trigger Time:   2026-06-14T14:30:22Z
    Git Ref:        refs/tags/pro-v1.0.0
    Git SHA:        a1b2c3d4e5f6g7h8i9j0
 ----------------------------------------------
-✅ GitHub Release: Completed
-✅ Docker Hub:     Completed
-✅ GHCR:           Completed
-✅ Multi-arch:     Completed
+GitHub Release: Completed
+Docker Hub:     Completed
+GHCR:           Completed
+Multi-arch:     Completed
 ==============================================
 ```
-
-### 7.3 审计日志保留
-
-| 类型 | 保留期限 | 说明 |
-|------|---------|------|
-| 工作流日志 | 90天 | GitHub Actions默认 |
-| Trivy扫描结果 | 30天 | 可配置 |
-| SBOM | 90天 | 可配置 |
 
 ---
 
@@ -357,18 +336,18 @@ Environment:   Production
 **错误信息**：
 ```
 Invalid workflow file: .github/workflows/commercial-build-deploy.yml#L1
-(Line: 254, Col: 14): The expression is not closed.
+(Line: 626, Col: 5): Required property is missing: runs-on
 ```
 
 **解决方案**：
-- 检查`${{ }}`表达式是否正确闭合
-- 确保条件表达式使用`${{ }}`包裹
+- 检查job是否缺少`runs-on`属性
+- 确保所有job定义完整
 
-#### 8.1.2 secrets上下文错误
+#### 8.1.2 条件表达式错误
 
 **错误信息**：
 ```
-Unrecognized named-value: 'secrets'. Located at position 1 within expression
+Unrecognized named-value: 'secrets'. Located at position 1
 ```
 
 **解决方案**：
@@ -379,7 +358,7 @@ Unrecognized named-value: 'secrets'. Located at position 1 within expression
 
 **错误信息**：
 ```
-HTTP 403: Could not delete the workflow run
+HTTP 403: denied
 ```
 
 **解决方案**：
@@ -404,11 +383,11 @@ gh run view <run-id> --log --repo changsongyang/rustdesk-server
 1. **启用调试日志**
    - 在工作流中添加`echo "DEBUG: $VAR"`输出
 
-2. **跳过特定步骤**
-   - 手动触发时使用`skip-deploy`参数
-
-3. **检查artifacts**
+2. **检查artifacts**
    - 访问GitHub Actions artifacts页面下载构建产物
+
+3. **检查部署条件**
+   - 查看`should_deploy`输出值是否正确
 
 ---
 
@@ -420,7 +399,6 @@ gh run view <run-id> --log --repo changsongyang/rustdesk-server
 |------|------|
 | 商业版CI工作流 | `.github/workflows/commercial-ci.yml` |
 | 商业版CD工作流 | `.github/workflows/commercial-build-deploy.yml` |
-| 社区版工作流 | `.github/workflows/build.yaml` |
 | Cargo配置 | `commercial/Cargo.toml` |
 | Docker配置 | `commercial/docker/` |
 
