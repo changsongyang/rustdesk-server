@@ -406,6 +406,7 @@ jobs:
           echo "all_passed=$([ "$STATUS" == "success" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
       
       - name: Fail - On Build Failure
+        if: steps.status.outputs.build_status == 'failed'
         run: |
           echo "=============================================="
           echo "         Build Validation Failed              "
@@ -415,6 +416,7 @@ jobs:
           exit 1
       
       - name: Complete - Build Summary
+        if: steps.status.outputs.build_status == 'success'
         run: |
           echo "=============================================="
           echo "    Build Pipeline Completed Successfully     "
@@ -620,7 +622,7 @@ jobs:
     needs: 
       - pre-build
       - build-summary
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
@@ -634,6 +636,21 @@ jobs:
           - { name: "armv7",   docker_platform: "linux/arm/v7" }
     
     steps:
+      - name: Debug - Check Variables
+        run: |
+          echo "=============================================="
+          echo "         Docker Build Debug Information         "
+          echo "=============================================="
+          echo "DEBUG: should_deploy = '${{ needs.pre-build.outputs.should_deploy }}'"
+          echo "DEBUG: build-summary.result = '${{ needs.build-summary.result }}'"
+          echo "DEBUG: git_tag = '${{ needs.pre-build.outputs.git_tag }}'"
+          echo "DEBUG: DOCKERHUB_IMAGE = '${{ env.DOCKERHUB_IMAGE }}'"
+          echo "DEBUG: GHCR_IMAGE = '${{ env.GHCR_IMAGE }}'"
+          echo "DEBUG: LATEST_TAG = '${{ env.LATEST_TAG }}'"
+          echo "DEBUG: matrix.job.name = '${{ matrix.job.name }}'"
+          echo "DEBUG: matrix.job.docker_platform = '${{ matrix.job.docker_platform }}'"
+          echo "=============================================="
+      
       - name: Start - Docker Build (${{ matrix.job.name }})
         run: |
           echo "=============================================="
@@ -648,8 +665,9 @@ jobs:
       
       - name: Set - Version Variables
         run: |
-          echo "GIT_TAG=${{ needs.pre-build.outputs.git_tag }}" >> $GITHUB_ENV
-          echo "DEBUG: GIT_TAG set to ${{ needs.pre-build.outputs.git_tag }}"
+          GIT_TAG="${{ needs.pre-build.outputs.git_tag || 'dev-unknown' }}"
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_ENV
+          echo "DEBUG: GIT_TAG set to $GIT_TAG"
       
       - name: Download - Build Artifacts
         uses: actions/download-artifact@v5
