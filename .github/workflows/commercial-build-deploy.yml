@@ -3,35 +3,39 @@ name: Commercial Build & Deploy
 # ================================================================================
 # RustDesk Pro Server Commercial Edition CI/CD Workflow
 # ================================================================================
-# 
-# 优化目标：
-# 1. 结构化顺序：构建阶段 -> 部署阶段
-# 2. 并行执行：Linux 多架构并行构建
-# 3. 依赖管理：严格的阶段依赖关系
-# 4. 错误处理：构建失败时阻止部署
-# 5. 进度跟踪：每个阶段的状态报告
 #
-# 任务优先级顺序：
+# 优化目标:
+# 1. 结构化顺序: 构建阶段 -> 部署阶段
+# 2. 并行执行: Linux 多架构并行构建
+# 3. 依赖管理: 严格的阶段依赖关系
+# 4. 错误处理: 构建失败时阻止部署
+# 5. 进度跟踪: 每个阶段的状态报告
+#
+# 任务优先级顺序:
 #   P1 (准备)   - pre-build: 构建准备和版本信息
-#   P2 (构建)   - build-linux/build-windows: 并行构建（最多5个并行）
+#   P2 (构建)   - build-linux/build-windows: 并行构建(最多5个并行)
 #   P3 (验证)   - build-summary: 构建结果验证
 #   P4 (打包)   - deb-package: Debian 包构建
 #   P5 (发布)   - github-release: GitHub Release 发布
-#   P6 (部署)   - docker-build: Docker 镜像构建（最多5个并行）
+#   P6 (部署)   - docker-build: Docker 镜像构建(最多5个并行)
 #   P7 (汇总)   - docker-manifest: Docker Manifest 创建
 #   P8 (总结)   - deploy-summary: 部署结果汇总
 #
-# 并行执行策略：
-#   - build-linux: 最多5个架构并行（amd64, arm64v8, armv7）
+# 并行执行策略:
+#   - build-linux: 最多5个架构并行(amd64, arm64v8, armv7)
 #   - build-windows: 与 build-linux 并行执行
 #   - docker-build: 最多5个架构并行
 #
-# 依赖关系链：
+# 依赖关系链:
 #   pre-build -> build-* -> build-summary -> deb-package -> github-release -> docker-build -> docker-manifest -> deploy-summary
 #
-# 失败阻断机制：
+# 失败阻断机制:
 #   Build 失败 -> 阻断 deb-package, github-release, docker-build
 #   build-summary 失败 -> 阻断所有 CD 任务
+#
+# 触发方式:
+#   - 推送 pro-v* 或 pro-* tag 到 main 分支
+#   - 手动 workflow_dispatch 触发
 #
 # ================================================================================
 
@@ -41,37 +45,20 @@ permissions:
   id-token: write
 
 on:
-  # 方式1: CI 工作流成功完成后触发
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
-    branches: [main]
-  
-  # 方式2: 推送 tag 触发（独立触发，不依赖 CI）
+  # 方式1: 推送 tag 触发（独立触发，不依赖 CI）
   push:
     branches: [main]
     tags:
       - 'pro-v*'
       - 'pro-*'
   
-  # 方式3: 手动触发
+  # 方式2: 手动触发
   workflow_dispatch:
     inputs:
       version:
         description: '版本号 (e.g., pro-v1.0.0)'
         required: false
         type: string
-      skip-ci-check:
-        description: '跳过 CI 状态检查（仅用于紧急发布）'
-        required: false
-        type: boolean
-        default: false
-      skip-deploy:
-        description: '跳过部署阶段'
-        required: false
-        type: boolean
-        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -106,14 +93,16 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      
+
+      # 生成唯一构建ID: 时间戳-Git短SHA
       - name: Generate - Build ID
         id: build-id
         run: |
           BUILD_ID=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::8}
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
-      
+
+      # 提取版本信息: 从tag/手动输入/dev分支获取git_tag和deb_version
       - name: Extract - Version Information
         id: vars
         run: |
@@ -132,7 +121,8 @@ jobs:
           VERSION=${VERSION#v}
           echo "deb_version=$VERSION" >> $GITHUB_OUTPUT
           echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
-      
+
+      # 判断是否需要部署: push tag 或 手动触发 则部署
       - name: Determine - Deployment Status
         id: deploy-check
         run: |
@@ -217,6 +207,7 @@ jobs:
         with:
           key: ${{ matrix.job.target }}
       
+      # 使用 cross 工具进行跨架构编译，使用 musl 静态链接
       - name: Compile - Build Binary
         run: |
           rm -f commercial/Cargo.lock
@@ -303,6 +294,7 @@ jobs:
       - name: Cache - Cargo Dependencies
         uses: Swatinem/rust-cache@v2
       
+      # 使用 MSVC 工具链编译 Windows x86_64 二进制文件
       - name: Compile - Build Binary
         run: cargo build --manifest-path commercial/Cargo.toml --release --target=x86_64-pc-windows-msvc
         env:
@@ -483,6 +475,7 @@ jobs:
           sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install -y debhelper fakeroot ${{ matrix.job.crossbuild_package }}
       
+      # 使用 fakeroot 创建 Debian 包，包含二进制文件和 DEBIAN/control 元数据
       - name: Build - Debian Package
         env:
           CONTROL_FILE_CONTENT: |
@@ -689,6 +682,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       
+      # 使用 docker/build-push-action 构建并推送多架构镜像到 Docker Hub 和 GHCR
       - name: Build - Docker Image
         uses: docker/build-push-action@v5
         with:
