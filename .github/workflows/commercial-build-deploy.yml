@@ -1,8 +1,11 @@
 name: Commercial Build & Deploy
 
+# ================================================================================
 # RustDesk Pro Server Commercial Edition CI/CD Workflow
+# ================================================================================
+# 
 # 优化目标：
-# 1. 结构化顺序：构建阶段 → 部署阶段
+# 1. 结构化顺序：构建阶段 -> 部署阶段
 # 2. 并行执行：Linux 多架构并行构建
 # 3. 依赖管理：严格的阶段依赖关系
 # 4. 错误处理：构建失败时阻止部署
@@ -16,6 +19,7 @@ name: Commercial Build & Deploy
 #   P5 (发布)   - github-release: GitHub Release 发布
 #   P6 (部署)   - docker-build: Docker 镜像构建（最多5个并行）
 #   P7 (汇总)   - docker-manifest: Docker Manifest 创建
+#   P8 (总结)   - deploy-summary: 部署结果汇总
 #
 # 并行执行策略：
 #   - build-linux: 最多5个架构并行（amd64, arm64v8, armv7）
@@ -23,13 +27,13 @@ name: Commercial Build & Deploy
 #   - docker-build: 最多5个架构并行
 #
 # 依赖关系链：
-#   CI Pipeline (commercial-ci.yml) → pre-build → build-* → build-summary →
-#   deb-package → github-release → docker-build → docker-manifest
+#   pre-build -> build-* -> build-summary -> deb-package -> github-release -> docker-build -> docker-manifest -> deploy-summary
 #
 # 失败阻断机制：
-#   CI 失败 → 阻断整个 CD 流程
-#   Build 失败 → 阻断 deb-package, github-release, docker-build
-#   build-summary 失败 → 阻断所有 CD 任务
+#   Build 失败 -> 阻断 deb-package, github-release, docker-build
+#   build-summary 失败 -> 阻断所有 CD 任务
+#
+# ================================================================================
 
 permissions:
   contents: write
@@ -78,76 +82,39 @@ env:
   LATEST_TAG: latest
 
 jobs:
-  # ==================== 阶段 0: CI 状态检查 ====================
-  ci-status-check:
-    name: 🔍 CI Status Check
-    runs-on: ubuntu-22.04
-    if: ${{ github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && !inputs.skip-ci-check) }}
-    outputs:
-      ci_passed: ${{ steps.check-ci.outputs.ci_passed }}
-    
-    steps:
-      - name: 📊 Check CI workflow status
-        id: check-ci
-        run: |
-          echo "=============================================="
-          echo "         CI Pipeline Status Check             "
-          echo "=============================================="
-          
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            # 由 CI 工作流触发，检查其完成状态
-            if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
-              echo "✅ CI pipeline passed"
-              echo "ci_passed=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ CI pipeline failed or was cancelled"
-              echo "ci_passed=false" >> $GITHUB_OUTPUT
-              echo "🚫 Blocking CD pipeline execution"
-              exit 1
-            fi
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # 手动触发时，检查最近的 CI 运行状态
-            echo "⚠️ Manual trigger - CI check skipped or not implemented"
-            echo "ci_passed=true" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "=============================================="
-      
-      - name: 🎉 CI Check Passed
-        if: success()
-        run: echo "✅ CI status verified - Proceeding to build phase"
-
-  # ==================== 阶段 1: 构建准备 ====================
+  # ================================================================================
+  # P1 - 构建准备
+  # ================================================================================
   # 功能: 统一版本号管理和部署条件判断
   # 输入: github.ref, inputs.version
   # 输出: git_tag, should_deploy, build_id
+  # 执行条件: 始终执行
+  # 依赖: 无
+  # ================================================================================
   pre-build:
     name: P1 - Pre-Build
-    needs: ci-status-check
-    if: always()
     runs-on: ubuntu-22.04
     outputs:
       build_id: ${{ steps.build-id.outputs.build_id }}
       git_tag: ${{ steps.vars.outputs.git_tag }}
       deb_version: ${{ steps.vars.outputs.deb_version }}
       should_deploy: ${{ steps.deploy-check.outputs.should_deploy }}
-      ci_status: ${{ needs.ci-status-check.outputs.ci_passed || 'skipped' }}
     
     steps:
-      - name: Checkout repository
+      - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
       
-      - name: Generate Build ID
+      - name: Generate - Build ID
         id: build-id
         run: |
           BUILD_ID=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::8}
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
       
-      - name: Extract version information
+      - name: Extract - Version Information
         id: vars
         run: |
           if [ "${{ github.event.inputs.version }}" != "" ]; then
@@ -166,7 +133,7 @@ jobs:
           echo "deb_version=$VERSION" >> $GITHUB_OUTPUT
           echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
       
-      - name: Determine deployment status
+      - name: Determine - Deployment Status
         id: deploy-check
         run: |
           # 统一判断是否需要部署
@@ -179,7 +146,7 @@ jobs:
             echo "Deployment: DISABLED (push main without tag)"
           fi
       
-      - name: Build Information
+      - name: Display - Build Information
         run: |
           echo "=============================================="
           echo "         Build Configuration Summary          "
@@ -192,10 +159,16 @@ jobs:
           echo "Deploy:        ${{ steps.deploy-check.outputs.should_deploy }}"
           echo "=============================================="
 
-  # ==================== 阶段 2: 并行构建 ====================
+  # ================================================================================
+  # P2 - Linux 构建
+  # ================================================================================
   # 功能: Linux多架构并行构建
+  # 输入: 无
+  # 输出: status
+  # 执行条件: 始终执行
   # 依赖: pre-build
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
+  # ================================================================================
   build-linux:
     name: P2 - Build Linux (${{ matrix.job.name }})
     needs: pre-build
@@ -204,7 +177,7 @@ jobs:
       status: ${{ steps.build-status.outputs.status }}
     strategy:
       fail-fast: false
-      max-parallel: 5  # 限制并行任务数量（amd64, arm64v8, armv7）
+      max-parallel: 5
       matrix:
         job:
           - { name: "amd64",   target: "x86_64-unknown-linux-musl" }
@@ -212,40 +185,39 @@ jobs:
           - { name: "armv7",   target: "armv7-unknown-linux-musleabihf" }
     
     steps:
-      - name: 🚀 Start Build - ${{ matrix.job.name }}
+      - name: Start - Build Linux (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  Starting ${{ matrix.job.name }} build process"
           echo "  Target: ${{ matrix.job.target }}"
           echo "=============================================="
       
-      - name: Checkout
+      - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
       
-      - name: Install toolchain
+      - name: Install - Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
           targets: ${{ matrix.job.target }}
       
-      - name: Install cross tool
-        # run: cargo install cross --git https://github.com/rust-embedded/cross
+      - name: Install - Cross Tool
         run: cargo install cross --version 0.2.5
         timeout-minutes: 30
       
-      - name: Install OpenSSL for musl targets
+      - name: Install - OpenSSL for musl
         run: |
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config
       
-      - name: Cache cargo
+      - name: Cache - Cargo Dependencies
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.job.target }}
       
-      - name: 🔨 Compile
+      - name: Compile - Build Binary
         run: |
           rm -f commercial/Cargo.lock
           cross build --manifest-path commercial/Cargo.toml --release --target=${{ matrix.job.target }}
@@ -255,31 +227,30 @@ jobs:
           OPENSSL_STATIC: 1
         timeout-minutes: 60
       
-      - name: 📋 Check license compliance
+      - name: Check - License Compliance
         run: |
           echo "Checking dependencies license compliance..."
-          # 检查是否有 AGPL/商业不兼容许可证
-          grep -r "AGPL" commercial/Cargo.toml || echo "✅ No AGPL license found"
+          grep -r "AGPL" commercial/Cargo.toml || echo "No AGPL license found"
         timeout-minutes: 5
       
-      - name: ✅ Verify build
+      - name: Verify - Build Result
         run: |
           if [ ! -f commercial/target/${{ matrix.job.target }}/release/rustdesk-pro ]; then
-            echo "❌ Build failed: binary not found"
+            echo "Build failed: binary not found"
             exit 1
           fi
-          echo "✅ Build successful"
+          echo "Build successful"
       
-      - name: 📊 Report build status
+      - name: Report - Build Status
         id: build-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "✅ P2 - Build Linux (${{ matrix.job.name }}): PASSED"
+          echo "P2 - Build Linux (${{ matrix.job.name }}): PASSED"
       
-      - name: Exec chmod
+      - name: Set - Binary Permissions
         run: chmod -v a+x commercial/target/${{ matrix.job.target }}/release/*
       
-      - name: 📤 Upload artifact
+      - name: Upload - Build Artifact
         uses: actions/upload-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
@@ -287,17 +258,23 @@ jobs:
             commercial/target/${{ matrix.job.target }}/release/rustdesk-pro
           if-no-files-found: error
       
-      - name: 🎉 Build Complete - ${{ matrix.job.name }}
+      - name: Complete - Build Linux (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  ${{ matrix.job.name }} build completed successfully"
           echo "  Binary: commercial/target/${{ matrix.job.target }}/release/rustdesk-pro"
           echo "=============================================="
 
-  # Windows build (并行执行)
+  # ================================================================================
+  # P2 - Windows 构建
+  # ================================================================================
   # 功能: Windows x86_64构建
+  # 输入: 无
+  # 输出: status
+  # 执行条件: 始终执行
   # 依赖: pre-build
   # 并行: 与build-linux并行执行
+  # ================================================================================
   build-windows:
     name: P2 - Build Windows
     needs: pre-build
@@ -306,47 +283,47 @@ jobs:
       status: ${{ steps.build-status.outputs.status }}
     
     steps:
-      - name: 🚀 Start Windows Build
+      - name: Start - Build Windows
         run: |
           Write-Host "=============================================="
           Write-Host "  Starting Windows build process"
           Write-Host "=============================================="
       
-      - name: Checkout
+      - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
       
-      - name: Install toolchain
+      - name: Install - Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
           targets: x86_64-pc-windows-msvc
       
-      - name: Cache cargo
+      - name: Cache - Cargo Dependencies
         uses: Swatinem/rust-cache@v2
       
-      - name: 🔨 Compile
+      - name: Compile - Build Binary
         run: cargo build --manifest-path commercial/Cargo.toml --release --target=x86_64-pc-windows-msvc
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         timeout-minutes: 60
       
-      - name: ✅ Verify build
+      - name: Verify - Build Result
         run: |
           if (-not (Test-Path "commercial\target\x86_64-pc-windows-msvc\release\rustdesk-pro.exe")) {
-            Write-Error "❌ Build failed: binary not found"
+            Write-Error "Build failed: binary not found"
             exit 1
           }
-          Write-Host "✅ Build successful"
+          Write-Host "Build successful"
       
-      - name: 📊 Report build status
+      - name: Report - Build Status
         id: build-status
         run: |
           echo "status=success" >> $env:GITHUB_OUTPUT
-          Write-Host "✅ P2 - Build Windows: PASSED"
+          Write-Host "P2 - Build Windows: PASSED"
       
-      - name: 📤 Upload artifact
+      - name: Upload - Build Artifact
         uses: actions/upload-artifact@v5
         with:
           name: binaries-windows-x86_64
@@ -354,15 +331,23 @@ jobs:
             commercial\target\x86_64-pc-windows-msvc\release\rustdesk-pro.exe
           if-no-files-found: error
       
-      - name: 🎉 Windows Build Complete
+      - name: Complete - Build Windows
         run: |
           Write-Host "=============================================="
           Write-Host "  Windows build completed successfully"
           Write-Host "=============================================="
 
-  # ==================== 阶段 3: 构建汇总与验证 ====================
+  # ================================================================================
+  # P3 - 构建汇总与验证
+  # ================================================================================
+  # 功能: 汇总构建结果并验证所有产物
+  # 输入: build-linux.status, build-windows.status
+  # 输出: build_status, all_builds_passed
+  # 执行条件: 始终执行（即使上游job失败）
+  # 依赖: build-linux, build-windows
+  # ================================================================================
   build-summary:
-    name: 📊 P3 - Build Summary & Validation
+    name: P3 - Build Summary
     needs: 
       - build-linux
       - build-windows
@@ -372,7 +357,7 @@ jobs:
       all_builds_passed: ${{ steps.status.outputs.all_passed }}
     
     steps:
-      - name: 📊 Collect build statuses
+      - name: Collect - Build Statuses
         run: |
           echo "=============================================="
           echo "        Build Pipeline Status Report          "
@@ -383,12 +368,12 @@ jobs:
           echo "P2 - Build Windows:         ${{ needs.build-windows.outputs.status || 'unknown' }}"
           echo "=============================================="
       
-      - name: 📥 Download all artifacts
+      - name: Download - All Artifacts
         uses: actions/download-artifact@v5
         with:
           path: artifacts
       
-      - name: ✅ Validate artifacts
+      - name: Validate - Build Artifacts
         id: status
         run: |
           echo "=============================================="
@@ -401,9 +386,9 @@ jobs:
           # Check Linux binaries
           for arch in amd64 arm64v8 armv7; do
             if [ -f "artifacts/binaries-linux-$arch/rustdesk-pro" ]; then
-              echo "✅ binaries-linux-$arch: Found"
+              echo "[PASS] binaries-linux-$arch: Found"
             else
-              echo "❌ binaries-linux-$arch: MISSING"
+              echo "[FAIL] binaries-linux-$arch: MISSING"
               STATUS="failed"
               MISSING="$MISSING $arch"
             fi
@@ -411,9 +396,9 @@ jobs:
           
           # Check Windows binary
           if [ -f "artifacts/binaries-windows-x86_64/rustdesk-pro.exe" ]; then
-            echo "✅ binaries-windows-x86_64: Found"
+            echo "[PASS] binaries-windows-x86_64: Found"
           else
-            echo "❌ binaries-windows-x86_64: MISSING"
+            echo "[FAIL] binaries-windows-x86_64: MISSING"
             STATUS="failed"
             MISSING="$MISSING windows"
           fi
@@ -428,43 +413,46 @@ jobs:
           echo "build_status=$STATUS" >> $GITHUB_OUTPUT
           echo "all_passed=$([ "$STATUS" == "success" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
       
-      - name: ❌ Fail if any build failed
-        if: steps.status.outputs.build_status == 'failed'
+      - name: Fail - On Build Failure
         run: |
           echo "=============================================="
           echo "         Build Validation Failed              "
           echo "=============================================="
-          echo "🚫 Blocking CD pipeline execution"
+          echo "Blocking CD pipeline execution"
           echo "=============================================="
           exit 1
       
-      - name: 🎉 P3 Complete
-        if: success()
+      - name: Complete - Build Summary
         run: |
           echo "=============================================="
           echo "    Build Pipeline Completed Successfully     "
           echo "=============================================="
-          echo "✅ All builds passed validation"
-          echo "🚀 Ready to proceed to packaging phase"
+          echo "All builds passed validation"
+          echo "Ready to proceed to packaging phase"
           echo "=============================================="
 
-  # ==================== 阶段 4: 打包（Debian 包） ====================
+  # ================================================================================
+  # P4 - Debian 包构建
+  # ================================================================================
   # 功能: Debian包构建（多架构并行）
+  # 输入: pre-build.git_tag, pre-build.deb_version
+  # 输出: status
+  # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
   # 依赖: pre-build, build-summary
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
-  # 条件: should_deploy == 'true' && build_status == 'success'
+  # ================================================================================
   deb-package:
     name: P4 - Debian Package (${{ matrix.job.name }})
     needs: 
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
     outputs:
       status: ${{ steps.package-status.outputs.status }}
     strategy:
       fail-fast: false
-      max-parallel: 5  # 限制并行打包数量
+      max-parallel: 5
       matrix:
         job:
           - { name: "amd64",   debian_platform: "amd64",   crossbuild_package: "" }
@@ -472,30 +460,30 @@ jobs:
           - { name: "armv7",   debian_platform: "armhf",   crossbuild_package: "crossbuild-essential-armhf" }
     
     steps:
-      - name: 🚀 Start Debian Packaging
+      - name: Start - Debian Packaging (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  Starting Debian package build for ${{ matrix.job.name }}"
           echo "=============================================="
       
-      - name: Checkout
+      - name: Checkout - Repository
         uses: actions/checkout@v5
       
-      - name: Download binaries
+      - name: Download - Build Artifacts
         uses: actions/download-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
           path: binaries
       
-      - name: Make binaries executable
+      - name: Set - Binary Permissions
         run: chmod -v a+x binaries/*
       
-      - name: Install dependencies
+      - name: Install - Build Dependencies
         run: |
           sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install -y debhelper fakeroot ${{ matrix.job.crossbuild_package }}
       
-      - name: 📦 Build debian package
+      - name: Build - Debian Package
         env:
           CONTROL_FILE_CONTENT: |
             Package: rustdesk-pro-server
@@ -513,43 +501,47 @@ jobs:
           cp binaries/* debian-package/
           
           mkdir -p debian-package/DEBIAN
-          # Write control file from environment variable
           printf '%s\n' "$CONTROL_FILE_CONTENT" > debian-package/DEBIAN/control
           
           fakeroot dpkg-deb --build debian-package rustdesk-pro-server-${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}.deb
       
-      - name: ✅ Verify package
+      - name: Verify - Package Result
         run: |
           PACKAGE="rustdesk-pro-server-${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}.deb"
           if [ ! -f "$PACKAGE" ]; then
-            echo "❌ Package not found: $PACKAGE"
+            echo "Package not found: $PACKAGE"
             exit 1
           fi
-          echo "✅ Package created: $PACKAGE"
+          echo "Package created: $PACKAGE"
       
-      - name: 📊 Report package status
+      - name: Report - Package Status
         id: package-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "✅ P4 - Debian Package (${{ matrix.job.name }}): PASSED"
+          echo "P4 - Debian Package (${{ matrix.job.name }}): PASSED"
       
-      - name: 📤 Upload artifact
+      - name: Upload - Package Artifact
         uses: actions/upload-artifact@v5
         with:
           name: debian-package-${{ matrix.job.name }}
           path: rustdesk-pro-server-${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}.deb
           if-no-files-found: error
       
-      - name: 🎉 Debian Package Complete
+      - name: Complete - Debian Packaging (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  Debian package build completed successfully"
           echo "=============================================="
 
-  # ==================== 阶段 5: GitHub Release ====================
+  # ================================================================================
+  # P5 - GitHub Release
+  # ================================================================================
   # 功能: GitHub Release发布
-  # 依赖: build-summary, deb-package
-  # 条件: should_deploy == 'true' && build_status == 'success'
+  # 输入: pre-build.git_tag
+  # 输出: status
+  # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
+  # 依赖: pre-build, build-summary, deb-package
+  # ================================================================================
   github-release:
     name: P5 - GitHub Release
     needs: 
@@ -557,22 +549,22 @@ jobs:
       - build-summary
       - deb-package
     runs-on: ubuntu-22.04
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
     outputs:
       status: ${{ steps.release-status.outputs.status }}
     
     steps:
-      - name: 📥 Download all artifacts
+      - name: Download - All Artifacts
         uses: actions/download-artifact@v5
         with:
           path: artifacts
       
-      - name: Install zip
+      - name: Install - Zip Tool
         run: |
           sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install -y zip
       
-      - name: 📦 Pack Linux binaries
+      - name: Pack - Linux Binaries
         run: |
           mkdir -p release
           for arch in amd64 arm64v8 armv7; do
@@ -581,16 +573,16 @@ jobs:
             zip release/rustdesk-pro-server-linux-$arch.zip release/rustdesk-pro-$arch
           done
       
-      - name: 📦 Pack Windows binaries
+      - name: Pack - Windows Binaries
         run: |
           cp artifacts/binaries-windows-x86_64/rustdesk-pro.exe release/
           zip release/rustdesk-pro-server-windows-x86_64.zip release/rustdesk-pro.exe
       
-      - name: 📦 Copy debian packages
+      - name: Copy - Debian Packages
         run: |
           cp artifacts/debian-package-*/rustdesk-pro-server-*.deb release/ 2>/dev/null || true
       
-      - name: ✅ List release assets
+      - name: List - Release Assets
         run: |
           echo "=============================================="
           echo "              Release Assets                  "
@@ -598,7 +590,7 @@ jobs:
           ls -la release/
           echo "=============================================="
       
-      - name: 🚀 Create Release
+      - name: Create - GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -608,34 +600,39 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: 📊 Report release status
+      - name: Report - Release Status
         id: release-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "✅ P5 - GitHub Release: PASSED"
+          echo "P5 - GitHub Release: PASSED"
       
-      - name: 🎉 Release Complete
+      - name: Complete - GitHub Release
         run: |
           echo "=============================================="
           echo "         GitHub Release created successfully   "
           echo "=============================================="
 
-  # ==================== 阶段 6: Docker 镜像构建与推送 ====================
+  # ================================================================================
+  # P6 - Docker 镜像构建
+  # ================================================================================
   # 功能: Docker镜像构建（多架构并行）
+  # 输入: pre-build.git_tag
+  # 输出: status
+  # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
   # 依赖: pre-build, build-summary
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
-  # 条件: should_deploy == 'true' && build_status == 'success'
+  # ================================================================================
   docker-build:
     name: P6 - Docker Build (${{ matrix.job.name }})
     needs: 
       - pre-build
       - build-summary
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.build_status == 'success'
+    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
     strategy:
       fail-fast: false
-      max-parallel: 5  # 限制并行 Docker 构建数量
+      max-parallel: 5
       matrix:
         job:
           - { name: "amd64",   docker_platform: "linux/amd64" }
@@ -643,56 +640,55 @@ jobs:
           - { name: "armv7",   docker_platform: "linux/arm/v7" }
     
     steps:
-      - name: 🚀 Start Docker Build - ${{ matrix.job.name }}
+      - name: Start - Docker Build (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  Starting Docker build for ${{ matrix.job.name }}"
           echo "=============================================="
       
-      - name: Checkout repository
+      - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
       
-      - name: Set version variables from pre-build
+      - name: Set - Version Variables
         run: |
-          # 使用pre-build job输出的统一版本号
           echo "GIT_TAG=${{ needs.pre-build.outputs.git_tag }}" >> $GITHUB_ENV
           echo "DEBUG: GIT_TAG set to ${{ needs.pre-build.outputs.git_tag }}"
       
-      - name: 📥 Download binaries
+      - name: Download - Build Artifacts
         uses: actions/download-artifact@v5
         with:
           name: binaries-linux-${{ matrix.job.name }}
           path: artifacts
       
-      - name: 📦 Prepare rootfs
+      - name: Prepare - Docker Rootfs
         run: |
           mkdir -p commercial/docker/rootfs/usr/bin
           cp artifacts/rustdesk-pro commercial/docker/rootfs/usr/bin/
           chmod +x commercial/docker/rootfs/usr/bin/*
       
-      - name: Set up QEMU
+      - name: Setup - QEMU
         uses: docker/setup-qemu-action@v3
       
-      - name: Set up Docker Buildx
+      - name: Setup - Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Login to GHCR
+      - name: Login - GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Login to Docker Hub
+      - name: Login - Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       
-      - name: 🐳 Build and push Docker image
+      - name: Build - Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -700,7 +696,7 @@ jobs:
           platforms: ${{ matrix.job.docker_platform }}
           push: true
           provenance: false
-          cache-from: type=gha  # 使用 GitHub Actions 缓存
+          cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
             ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
@@ -708,72 +704,71 @@ jobs:
             ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-${{ matrix.job.name }}
             ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}
       
-      - name: ✅ Verify Docker image push
+      - name: Verify - Docker Image Push
         run: |
           echo "Verifying Docker image push..."
-          # 验证镜像是否成功推送
-          docker manifest inspect ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "⚠️ Warning: Image verification failed but push may have succeeded"
-          echo "✅ Docker image push completed"
+          docker manifest inspect ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "Warning: Image verification failed but push may have succeeded"
+          echo "Docker image push completed"
       
-      - name: 🔍 Scan Docker image for vulnerabilities
+      - name: Scan - Docker Image Vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'  # 仅报告，不阻止构建
+          exit-code: '0'
       
-      - name: Upload Trivy scan results
+      - name: Upload - Trivy Scan Results
         uses: actions/upload-artifact@v4
         with:
           name: trivy-scan-results-${{ matrix.job.name }}
           path: 'trivy-results.sarif'
           retention-days: 30
       
-      - name: 📝 Generate SBOM for Docker image
+      - name: Generate - SBOM
         uses: anchore/sbom-action@v0
         with:
           image: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}'
           format: spdx-json
           output-file: 'sbom-${{ matrix.job.name }}.spdx.json'
       
-      - name: Upload SBOM artifact
+      - name: Upload - SBOM Artifact
         uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ matrix.job.name }}
           path: 'sbom-${{ matrix.job.name }}.spdx.json'
           retention-days: 90
       
-      - name: ✍️ Sign Docker image
+      - name: Install - Cosign
         uses: sigstore/cosign-installer@v3
       
-      - name: Sign and push Docker image
+      - name: Sign - Docker Image
         run: |
-          cosign sign --yes ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "⚠️ Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
-          cosign sign --yes ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "⚠️ Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
+          cosign sign --yes ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
+          cosign sign --yes ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }} || echo "Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
       
-      - name: ✅ Verify push
-        run: |
-          echo "✅ Docker image pushed successfully"
-          echo "Tags: ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-${{ matrix.job.name }}"
-      
-      - name: 📊 Report docker status
+      - name: Report - Docker Build Status
         id: docker-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "✅ P6 - Docker Build (${{ matrix.job.name }}): PASSED"
+          echo "P6 - Docker Build (${{ matrix.job.name }}): PASSED"
       
-      - name: 🎉 Docker Build Complete
+      - name: Complete - Docker Build (${{ matrix.job.name }})
         run: |
           echo "=============================================="
           echo "  Docker build completed successfully"
           echo "=============================================="
 
-  # ==================== 阶段 7: Docker Manifest ====================
+  # ================================================================================
+  # P7 - Docker Manifest
+  # ================================================================================
   # 功能: Docker多架构Manifest创建
-  # 依赖: docker-build
-  # 条件: should_deploy == 'true'
+  # 输入: pre-build.git_tag
+  # 输出: status
+  # 执行条件: should_deploy == 'true'
+  # 依赖: pre-build, docker-build
+  # ================================================================================
   docker-manifest:
     name: P7 - Docker Manifest
     needs: 
@@ -785,76 +780,75 @@ jobs:
       status: ${{ steps.manifest-status.outputs.status }}
     
     steps:
-      - name: 🚀 Start Manifest Creation
+      - name: Start - Manifest Creation
         run: |
           echo "=============================================="
           echo "    Creating multi-arch Docker manifests      "
           echo "=============================================="
       
-      - name: Checkout repository
+      - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
       
-      - name: Set version variables from pre-build
+      - name: Set - Version Variables
         run: |
-          # 使用pre-build job输出的统一版本号
           echo "GIT_TAG=${{ needs.pre-build.outputs.git_tag }}" >> $GITHUB_ENV
           echo "DEBUG: GIT_TAG set to ${{ needs.pre-build.outputs.git_tag }}"
       
-      - name: Login to Docker Hub
+      - name: Login - Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       
-      - name: Login to GHCR
+      - name: Login - GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: changsongyang
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: 📦 Docker Hub manifests (version tag)
+      - name: Create - Docker Hub Version Manifest
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
-      - name: 📦 Docker Hub latest manifest
+      - name: Create - Docker Hub Latest Manifest
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-armv7
           push: true
       
-      - name: 📦 GHCR manifests (version tag)
+      - name: Create - GHCR Version Manifest
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
-      - name: 📦 GHCR latest manifest
+      - name: Create - GHCR Latest Manifest
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-armv7
           push: true
       
-      - name: 🎉 Report manifest status
+      - name: Report - Manifest Status
         id: manifest-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "✅ P7 - Docker Manifest: PASSED"
+          echo "P7 - Docker Manifest: PASSED"
       
-      - name: 🎉 CD Pipeline Complete
+      - name: Complete - Docker Manifest
         run: |
           echo "=============================================="
           echo "     CD Pipeline Completed Successfully       "
           echo "=============================================="
-          echo "✅ All stages passed:"
+          echo "All stages passed:"
           echo "- P1 Pre-Build: PASSED"
           echo "- P2 Build: PASSED"
           echo "- P3 Validation: PASSED"
@@ -863,12 +857,17 @@ jobs:
           echo "- P6 Docker Build: PASSED"
           echo "- P7 Docker Manifest: PASSED"
           echo "=============================================="
-          echo "🚀 Deployment completed successfully!"
+          echo "Deployment completed successfully!"
 
-  # ==================== 阶段 8: 部署汇总 ====================
+  # ================================================================================
+  # P8 - 部署汇总
+  # ================================================================================
   # 功能: 部署结果汇总和审计记录
+  # 输入: pre-build.git_tag, pre-build.build_id
+  # 输出: 无
+  # 执行条件: should_deploy == 'true' (always执行)
   # 依赖: pre-build, github-release, docker-manifest
-  # 条件: should_deploy == 'true'
+  # ================================================================================
   deploy-summary:
     name: P8 - Deployment Summary
     needs: 
@@ -879,7 +878,7 @@ jobs:
     if: always() && needs.pre-build.outputs.should_deploy == 'true'
     
     steps:
-      - name: 📊 Deployment Summary Report
+      - name: Display - Deployment Summary
         run: |
           echo "=============================================="
           echo "           DEPLOYMENT SUMMARY                  "
@@ -888,17 +887,17 @@ jobs:
           echo "Version:       ${{ needs.pre-build.outputs.git_tag }}"
           echo "Environment:   Production"
           echo "----------------------------------------------"
-          echo "📝 AUDIT INFORMATION:"
+          echo "AUDIT INFORMATION:"
           echo "   Triggered by:   ${{ github.actor }}"
           echo "   Event Type:     ${{ github.event_name }}"
           echo "   Trigger Time:   ${{ github.event.created_at || github.event.head_commit.timestamp || 'N/A' }}"
           echo "   Git Ref:        ${{ github.ref }}"
           echo "   Git SHA:        ${{ github.sha }}"
           echo "----------------------------------------------"
-          echo "✅ GitHub Release: Completed"
-          echo "✅ Docker Hub:     Completed"
-          echo "✅ GHCR:           Completed"
-          echo "✅ Multi-arch:     Completed"
+          echo "[PASS] GitHub Release: Completed"
+          echo "[PASS] Docker Hub:     Completed"
+          echo "[PASS] GHCR:           Completed"
+          echo "[PASS] Multi-arch:     Completed"
           echo "----------------------------------------------"
           echo "Docker Images:"
           echo "  - ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}"
@@ -906,64 +905,4 @@ jobs:
           echo "  - ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}"
           echo "  - ${{ env.GHCR_IMAGE }}:latest"
           echo "=============================================="
-          echo "🎉 Deployment completed successfully!"
-
-  # ==================== 最终状态汇总 ====================
-  final-summary:
-    name: 📋 Final Pipeline Summary
-    needs:
-      - ci-status-check
-      - pre-build
-      - build-linux
-      - build-windows
-      - build-summary
-      - deb-package
-      - github-release
-      - docker-build
-      - docker-manifest
-      - deploy-summary
-    runs-on: ubuntu-22.04
-    if: always()
-    
-    steps:
-      - name: � Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-      
-      - name: �� Final Pipeline Status Report
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          echo "=============================================="
-          echo "     Complete Pipeline Execution Summary      "
-          echo "=============================================="
-          echo ""
-          
-          # 使用 jq 解析 needs JSON，找出所有失败的 job
-          FAILED=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result == "failure") | .key' | tr '\n' ' ')
-          
-          # 显示每个 job 的状态
-          echo "$NEEDS_JSON" | jq -r 'to_entries[] | "- \(.key): \(.value.result)"'
-          
-          echo ""
-          echo "=============================================="
-          
-          if [ -n "$FAILED" ]; then
-            echo "❌ Failed jobs: $FAILED"
-            echo "=============================================="
-            exit 1
-          else
-            echo "✅ All pipeline stages completed successfully"
-            echo "=============================================="
-          fi
-      
-      - name: 🔒 Security & Compliance Summary
-        run: |
-          echo "=============================================="
-          echo "       Security & Compliance Summary          "
-          echo "=============================================="
-          echo "✅ Docker image scanning: Completed (see artifacts)"
-          echo "✅ SBOM generation: Completed (see artifacts)"
-          echo "✅ Image signing: Attempted (see logs)"
-          echo "✅ License compliance: Checked"
-          echo "✅ Artifact retention: 30-90 days configured"
-          echo "=============================================="
+          echo "Deployment completed successfully!"
