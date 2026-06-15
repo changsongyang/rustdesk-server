@@ -110,6 +110,8 @@ jobs:
             T=${{ github.event.inputs.version }}
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             T=${GITHUB_REF#refs/tags/}
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            T=$(git describe --tags --match="pro-v*" --abbrev=0 2>/dev/null || echo "pro-v${GITHUB_SHA::8}")
           else
             T="dev-${GITHUB_SHA::8}"
           fi
@@ -127,8 +129,10 @@ jobs:
         id: deploy-check
         run: |
           # 统一判断是否需要部署
-          # 条件: push tag (pro-v*/pro-*) 或 手动输入version
-          if [[ "${{ github.ref }}" == refs/tags/pro-* ]] || [[ "${{ github.event.inputs.version }}" != "" ]]; then
+          # 条件: push tag (pro-v*/pro-*) 或 手动输入version 或 手动触发workflow_dispatch
+          if [[ "${{ github.ref }}" == refs/tags/pro-* ]] || \
+             [[ "${{ github.event.inputs.version }}" != "" ]] || \
+             [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
             echo "Deployment: ENABLED"
           else
@@ -668,6 +672,14 @@ jobs:
           GIT_TAG="${{ needs.pre-build.outputs.git_tag || 'dev-unknown' }}"
           echo "GIT_TAG=$GIT_TAG" >> $GITHUB_ENV
           echo "DEBUG: GIT_TAG set to $GIT_TAG"
+      
+      - name: Validate - GIT_TAG Environment Variable
+        run: |
+          if [ -z "${{ env.GIT_TAG }}" ] || [ "${{ env.GIT_TAG }}" = "dev-unknown" ]; then
+            echo "Error: GIT_TAG environment variable is not properly set"
+            exit 1
+          fi
+          echo "GIT_TAG validation passed: ${{ env.GIT_TAG }}"
       
       - name: Download - Build Artifacts
         uses: actions/download-artifact@v5
