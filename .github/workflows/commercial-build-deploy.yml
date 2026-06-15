@@ -441,7 +441,7 @@ jobs:
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
     outputs:
       status: ${{ steps.package-status.outputs.status }}
     strategy:
@@ -544,7 +544,7 @@ jobs:
       - build-summary
       - deb-package
     runs-on: ubuntu-22.04
-    if: needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success'
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
     outputs:
       status: ${{ steps.release-status.outputs.status }}
     
@@ -788,7 +788,7 @@ jobs:
       - pre-build
       - docker-build
     runs-on: ubuntu-latest
-    if: needs.pre-build.outputs.should_deploy == 'true'
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' }}
     outputs:
       status: ${{ steps.manifest-status.outputs.status }}
     
@@ -888,7 +888,7 @@ jobs:
       - github-release
       - docker-manifest
     runs-on: ubuntu-22.04
-    if: always() && needs.pre-build.outputs.should_deploy == 'true'
+    if: ${{ always() && needs.pre-build.outputs.should_deploy == 'true' }}
     
     steps:
       - name: Display - Deployment Summary
