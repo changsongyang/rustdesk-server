@@ -406,6 +406,8 @@ jobs:
   build-summary:
     name: P4 - Build Summary
     needs: 
+      - pre-build
+      - code-quality
       - build-linux
       - build-windows
     runs-on: ubuntu-22.04
@@ -414,21 +416,54 @@ jobs:
       all_builds_passed: ${{ steps.status.outputs.all_passed }}
     
     steps:
+      - name: Debug - Workflow Context
+        run: |
+          echo "=============================================="
+          echo "         Build Summary Debug Information        "
+          echo "=============================================="
+          echo "GITHUB_REF: ${{ github.ref }}"
+          echo "GITHUB_EVENT_NAME: ${{ github.event_name }}"
+          echo "should_deploy: ${{ needs.pre-build.outputs.should_deploy }}"
+          echo "git_tag: ${{ needs.pre-build.outputs.git_tag }}"
+          echo "pre-build.result: ${{ needs.pre-build.result }}"
+          echo "code-quality.result: ${{ needs.code-quality.result }}"
+          echo "build-linux.result: ${{ needs.build-linux.result }}"
+          echo "build-windows.result: ${{ needs.build-windows.result }}"
+          echo "=============================================="
+      
       - name: Collect - Build Statuses
         run: |
           echo "=============================================="
           echo "        Build Pipeline Status Report          "
           echo "=============================================="
-          echo "P2 - Build Linux (amd64):   ${{ needs.build-linux.outputs.status || 'unknown' }}"
-          echo "P2 - Build Linux (arm64v8): ${{ needs.build-linux.outputs.status || 'unknown' }}"
-          echo "P2 - Build Linux (armv7):   ${{ needs.build-linux.outputs.status || 'unknown' }}"
-          echo "P2 - Build Windows:         ${{ needs.build-windows.outputs.status || 'unknown' }}"
+          echo "P2 - Code Quality:          ${{ needs.code-quality.result }}"
+          echo "P3 - Build Linux (amd64):   ${{ needs.build-linux.outputs.status || 'unknown' }}"
+          echo "P3 - Build Linux (arm64v8): ${{ needs.build-linux.outputs.status || 'unknown' }}"
+          echo "P3 - Build Linux (armv7):   ${{ needs.build-linux.outputs.status || 'unknown' }}"
+          echo "P3 - Build Windows:         ${{ needs.build-windows.outputs.status || 'unknown' }}"
+          echo "=============================================="
+      
+      - name: Debug - Artifact Directory Before Download
+        run: |
+          echo "=============================================="
+          echo "    Artifact Directory Before Download         "
+          echo "=============================================="
+          ls -la /home/runner/work/rustdesk-server/rustdesk-server/
           echo "=============================================="
       
       - name: Download - All Artifacts
         uses: actions/download-artifact@v5
         with:
           path: artifacts
+      
+      - name: Debug - Artifact Directory After Download
+        run: |
+          echo "=============================================="
+          echo "     Artifact Directory After Download          "
+          echo "=============================================="
+          find artifacts -type f 2>/dev/null || echo "No files found in artifacts"
+          ls -la artifacts/ 2>/dev/null || echo "artifacts directory doesn't exist"
+          echo "=============================================="
       
       - name: Validate - Build Artifacts
         id: status
