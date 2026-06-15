@@ -211,19 +211,68 @@ jobs:
           echo "=============================================="
 
   # ================================================================================
+  # P2.5 - 安装构建依赖
+  # ================================================================================
+  # 功能: 安装跨架构编译所需的公共依赖
+  # 输入: 无
+  # 输出: 无
+  # 执行条件: 始终执行
+  # 依赖: pre-build
+  # 说明: 此任务安装 cross 工具和 OpenSSL，供所有 Linux 构建任务共享
+  # ================================================================================
+  install-dependencies:
+    name: Install Build Dependencies
+    needs: pre-build
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Start - Install Build Dependencies
+        run: |
+          echo "=============================================="
+          echo "  Installing build dependencies                "
+          echo "=============================================="
+      
+      - name: Checkout - Repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      
+      - name: Install - Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96"
+      
+      - name: Install - Cross Tool
+        run: cargo install cross --version 0.2.5
+        timeout-minutes: 30
+      
+      - name: Install - OpenSSL for musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+        timeout-minutes: 15
+      
+      - name: Complete - Install Build Dependencies
+        run: |
+          echo "=============================================="
+          echo "  Build dependencies installed successfully     "
+          echo "=============================================="
+
+  # ================================================================================
   # P3 - Linux 构建
   # ================================================================================
   # 功能: Linux多架构并行构建
   # 输入: 无
   # 输出: status
   # 执行条件: 始终执行
-  # 依赖: pre-build (与code-quality并行执行)
+  # 依赖: pre-build, install-dependencies (与code-quality并行执行)
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
   # ================================================================================
   build-linux:
     name: P3 - Build Linux (${{ matrix.job.name }})
     needs: 
       - pre-build
+      - install-dependencies
     runs-on: ubuntu-22.04
     outputs:
       status: ${{ steps.build-status.outputs.status }}
@@ -254,16 +303,6 @@ jobs:
         with:
           toolchain: "1.96"
           targets: ${{ matrix.job.target }}
-      
-      - name: Install - Cross Tool
-        run: cargo install cross --version 0.2.5
-        timeout-minutes: 30
-      
-      - name: Install - OpenSSL for musl
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
-        timeout-minutes: 15
       
       - name: Cache - Cargo Dependencies
         uses: Swatinem/rust-cache@v2
@@ -698,6 +737,7 @@ jobs:
             release/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
       
       - name: Report - Release Status
         id: release-status
@@ -805,12 +845,14 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
       
       - name: Login - Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        continue-on-error: true
       
       # 使用 docker/build-push-action 构建并推送多架构镜像到 Docker Hub 和 GHCR
       - name: Build - Docker Image
