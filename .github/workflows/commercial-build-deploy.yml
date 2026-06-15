@@ -46,19 +46,78 @@ permissions:
   id-token: write
 
 on:
-  # 方式1: 推送 tag 触发（独立触发，不依赖 CI）
+  # ================================================================================
+  # 自动触发器
+  # ================================================================================
+  
+  # 分支推送触发（开发构建）
   push:
+    branches:
+      - 'main'
+      - 'master'
+      - 'develop'
+      - 'development'
+      - 'feature/**'
+      - 'feat/**'
+      - 'fix/**'
+      - 'bugfix/**'
+      - 'hotfix/**'
+      - 'release/**'
+      - 'dev/**'
+      - 'wip/**'
     tags:
+      # Tag 推送触发（生产构建）
       - 'pro-v*'
       - 'pro-*'
   
-  # 方式2: 手动触发
+  # 手动触发
   workflow_dispatch:
     inputs:
+      # 触发类型（必填）
+      trigger_type:
+        description: '触发类型'
+        required: true
+        type: choice
+        options:
+          - branch_with_version   # 分支+版本号 → 生产构建
+          - branch_no_version     # 分支无版本号 → 开发构建
+          - tag                   # 标签选择 → 生产构建
+      
+      # 版本号（条件必填 - branch_with_version 时）
       version:
-        description: '版本号 (e.g., pro-v1.0.0)'
+        description: '版本号 (e.g., pro-v1.0.0, 1.0.0)'
         required: false
         type: string
+      
+      # Git 标签（条件必填 - tag 时）
+      git_tag:
+        description: 'Git 标签 (从已有标签中选择)'
+        required: false
+        type: string
+      
+      # 构建控制（可选）
+      build_deb:
+        description: '构建 Debian 包'
+        required: false
+        type: boolean
+        default: false
+      
+      build_docker:
+        description: '构建 Docker 镜像'
+        required: false
+        type: boolean
+        default: false
+      
+      # Docker 镜像类型（可选）
+      docker_image_type:
+        description: 'Docker 镜像类型'
+        required: false
+        type: choice
+        options:
+          - both                 # 基础版本 + 拓展版本
+          - base                # 仅基础版本
+          - extended            # 仅拓展版本
+        default: both
 
 env:
   CARGO_TERM_COLOR: always
@@ -85,7 +144,11 @@ jobs:
       build_id: ${{ steps.build-id.outputs.build_id }}
       git_tag: ${{ steps.vars.outputs.git_tag }}
       deb_version: ${{ steps.vars.outputs.deb_version }}
+      build_type: ${{ steps.build-type.outputs.build_type }}
       should_deploy: ${{ steps.deploy-check.outputs.should_deploy }}
+      should_build_deb: ${{ steps.artifact-control.outputs.should_build_deb }}
+      should_build_base_image: ${{ steps.artifact-control.outputs.should_build_base_image }}
+      should_build_extended_image: ${{ steps.artifact-control.outputs.should_build_extended_image }}
     
     steps:
       - name: Checkout - Repository
@@ -106,39 +169,152 @@ jobs:
       - name: Extract - Version Information
         id: vars
         run: |
-          if [ "${{ github.event.inputs.version }}" != "" ]; then
-            T=${{ github.event.inputs.version }}
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
+          # =============================================
+          # 优先级1: 从 Git Tag 提取（自动触发 - push tag）
+          # =============================================
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             T=${GITHUB_REF#refs/tags/}
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            T=$(git describe --tags --match="pro-v*" --abbrev=0 2>/dev/null || echo "pro-v${GITHUB_SHA::8}")
+            echo "[INFO] Tag push detected: $T"
+          
+          # =============================================
+          # 优先级2: 从手动输入 version 提取（手动触发 branch_with_version）
+          # =============================================
+          elif [[ "${{ inputs.trigger_type }}" == "branch_with_version" ]] && [[ -n "${{ inputs.version }}" ]]; then
+            T="${{ inputs.version }}"
+            echo "[INFO] Manual trigger with version: $T"
+          
+          # =============================================
+          # 优先级3: 从手动选择 git_tag 提取（手动触发 tag）
+          # =============================================
+          elif [[ "${{ inputs.trigger_type }}" == "tag" ]] && [[ -n "${{ inputs.git_tag }}" ]]; then
+            T="${{ inputs.git_tag }}"
+            echo "[INFO] Manual tag trigger: $T"
+          
+          # =============================================
+          # 优先级4: 开发版本号（默认）
+          # =============================================
           else
             T="dev-${GITHUB_SHA::8}"
+            echo "[INFO] Development version: $T"
           fi
+          
           echo "git_tag=$T" >> $GITHUB_OUTPUT
           echo "GIT_TAG=$T" >> $GITHUB_ENV
           
+          # 统一标准化: 移除前缀
           VERSION=${T#pro-v}
           VERSION=${VERSION#pro-}
           VERSION=${VERSION#v}
           echo "deb_version=$VERSION" >> $GITHUB_OUTPUT
           echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 判断是否需要部署: push tag 或 手动触发 则部署
+      # 判断构建类型: prod 或 dev
+      - name: Determine - Build Type
+        id: build-type
+        run: |
+          # 1. 确定触发类型
+          # 方式A: 自动触发 - push tag
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TRIGGER_MODE="auto_tag"
+            echo "[INFO] Trigger mode: auto_tag"
+          
+          # 方式B: 自动触发 - push branch
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            TRIGGER_MODE="auto_branch"
+            echo "[INFO] Trigger mode: auto_branch"
+          
+          # 方式C: 手动触发 - workflow_dispatch
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TRIGGER_MODE="manual"
+            echo "[INFO] Trigger mode: manual"
+          fi
+          
+          # 2. 确定构建类型
+          if [[ "$TRIGGER_MODE" == "auto_tag" ]]; then
+            BUILD_TYPE="prod"
+            echo "[INFO] Build type: $BUILD_TYPE (auto tag push)"
+          
+          elif [[ "$TRIGGER_MODE" == "auto_branch" ]]; then
+            BUILD_TYPE="dev"
+            echo "[INFO] Build type: $BUILD_TYPE (auto branch push)"
+          
+          elif [[ "$TRIGGER_MODE" == "manual" ]]; then
+            if [[ "${{ inputs.trigger_type }}" == "branch_with_version" ]] || \
+               [[ "${{ inputs.trigger_type }}" == "tag" ]]; then
+              BUILD_TYPE="prod"
+              echo "[INFO] Build type: $BUILD_TYPE (manual: ${{ inputs.trigger_type }})"
+            else
+              BUILD_TYPE="dev"
+              echo "[INFO] Build type: $BUILD_TYPE (manual: ${{ inputs.trigger_type }})"
+            fi
+          fi
+          
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+          echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
+
+      # 判断是否需要部署
       - name: Determine - Deployment Status
         id: deploy-check
         run: |
-          # 统一判断是否需要部署
-          # 条件: push tag (pro-v*/pro-*) 或 手动输入version 或 手动触发workflow_dispatch
-          if [[ "${{ github.ref_type }}" == "tag" && "${{ github.ref }}" == refs/tags/pro-* ]] || \
-             [[ "${{ github.event.inputs.version }}" != "" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ env.BUILD_TYPE }}" == "prod" ]]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-            echo "Deployment: ENABLED"
+            echo "[INFO] Deployment: ENABLED (production build)"
           else
             echo "should_deploy=false" >> $GITHUB_OUTPUT
-            echo "Deployment: DISABLED (push main without tag)"
+            echo "[INFO] Deployment: DISABLED (development build)"
           fi
+
+      # 产物生成控制
+      - name: Determine - Artifact Control
+        id: artifact-control
+        run: |
+          # 4. 设置 Debian 包生成标志
+          if [[ "${{ env.BUILD_TYPE }}" == "prod" ]]; then
+            # 生产构建：默认构建，除非手动禁用
+            SHOULD_BUILD_DEB="${{ inputs.build_deb || 'true' }}"
+          else
+            # 开发构建：默认不构建，除非手动启用
+            SHOULD_BUILD_DEB="${{ inputs.build_deb || 'false' }}"
+          fi
+          
+          # 5. 设置 Docker 镜像生成标志
+          if [[ "${{ env.BUILD_TYPE }}" == "prod" ]]; then
+            # 生产构建：默认构建，除非手动禁用
+            SHOULD_BUILD_DOCKER="${{ inputs.build_docker || 'true' }}"
+          else
+            # 开发构建：默认不构建，除非手动启用
+            SHOULD_BUILD_DOCKER="${{ inputs.build_docker || 'false' }}"
+          fi
+          
+          # 6. 设置 Docker 镜像类型标志
+          if [[ "$SHOULD_BUILD_DOCKER" == "true" ]]; then
+            DOCKER_IMAGE_TYPE="${{ inputs.docker_image_type || 'both' }}"
+            case "$DOCKER_IMAGE_TYPE" in
+              both)
+                SHOULD_BUILD_BASE_IMAGE="true"
+                SHOULD_BUILD_EXTENDED_IMAGE="true"
+                ;;
+              base)
+                SHOULD_BUILD_BASE_IMAGE="true"
+                SHOULD_BUILD_EXTENDED_IMAGE="false"
+                ;;
+              extended)
+                SHOULD_BUILD_BASE_IMAGE="false"
+                SHOULD_BUILD_EXTENDED_IMAGE="true"
+                ;;
+            esac
+          else
+            SHOULD_BUILD_BASE_IMAGE="false"
+            SHOULD_BUILD_EXTENDED_IMAGE="false"
+          fi
+          
+          echo "should_build_deb=$SHOULD_BUILD_DEB" >> $GITHUB_OUTPUT
+          echo "should_build_base_image=$SHOULD_BUILD_BASE_IMAGE" >> $GITHUB_OUTPUT
+          echo "should_build_extended_image=$SHOULD_BUILD_EXTENDED_IMAGE" >> $GITHUB_OUTPUT
+          echo "[INFO] Artifact control:"
+          echo "  - should_build_deb: $SHOULD_BUILD_DEB"
+          echo "  - should_build_base_image: $SHOULD_BUILD_BASE_IMAGE"
+          echo "  - should_build_extended_image: $SHOULD_BUILD_EXTENDED_IMAGE"
       
       - name: Display - Build Information
         run: |
@@ -148,9 +324,13 @@ jobs:
           echo "Build ID:      $BUILD_ID"
           echo "Git Tag:       $GIT_TAG"
           echo "Deb Version:   $DEB_VERSION"
+          echo "Build Type:    $BUILD_TYPE"
           echo "Trigger:       ${{ github.event_name }}"
           echo "Ref:           ${{ github.ref }}"
-          echo "Deploy:        ${{ steps.deploy-check.outputs.should_deploy }}"
+          echo "should_deploy: ${{ steps.deploy-check.outputs.should_deploy }}"
+          echo "should_build_deb: ${{ steps.artifact-control.outputs.should_build_deb }}"
+          echo "should_build_base_image: ${{ steps.artifact-control.outputs.should_build_base_image }}"
+          echo "should_build_extended_image: ${{ steps.artifact-control.outputs.should_build_extended_image }}"
           echo "=============================================="
 
   # ================================================================================
@@ -535,7 +715,7 @@ jobs:
   # 功能: Debian包构建（多架构并行）
   # 输入: pre-build.git_tag, pre-build.deb_version
   # 输出: status
-  # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
+  # 执行条件: should_build_deb == 'true' && needs.build-summary.result == 'success'
   # 依赖: pre-build, build-summary
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
   # ================================================================================
@@ -545,7 +725,7 @@ jobs:
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
+    if: ${{ needs.pre-build.outputs.should_build_deb == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
     outputs:
       status: ${{ steps.package-status.outputs.status }}
     strategy:
@@ -639,13 +819,14 @@ jobs:
   # 输入: pre-build.git_tag
   # 输出: status
   # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
-  # 依赖: pre-build, build-summary
+  # 依赖: pre-build, build-summary, deb-package
   # ================================================================================
   github-release:
     name: P6 - GitHub Release
     needs: 
       - pre-build
       - build-summary
+      - deb-package
     runs-on: ubuntu-22.04
     if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
     outputs:
@@ -712,21 +893,21 @@ jobs:
           echo "=============================================="
 
   # ================================================================================
-  # P7 - Docker 镜像构建
+  # P7a - Docker 基础镜像构建
   # ================================================================================
-  # 功能: Docker镜像构建（多架构并行）
+  # 功能: Docker基础镜像构建（多架构并行）
   # 输入: pre-build.git_tag
   # 输出: status
-  # 执行条件: should_deploy == 'true' && needs.build-summary.result == 'success'
+  # 执行条件: should_build_base_image == 'true' && needs.build-summary.result == 'success'
   # 依赖: pre-build, build-summary
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
   # ================================================================================
-  docker-build:
-    name: P7 - Docker Build (${{ matrix.job.name }})
+  docker-build-base:
+    name: P7a - Docker Base (${{ matrix.job.name }})
     needs: 
       - pre-build
       - build-summary
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
+    if: ${{ needs.pre-build.outputs.should_build_base_image == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
@@ -743,9 +924,9 @@ jobs:
       - name: Debug - Check Variables
         run: |
           echo "=============================================="
-          echo "         Docker Build Debug Information         "
+          echo "         Docker Base Build Debug Information    "
           echo "=============================================="
-          echo "DEBUG: should_deploy = '${{ needs.pre-build.outputs.should_deploy }}'"
+          echo "DEBUG: should_build_base_image = '${{ needs.pre-build.outputs.should_build_base_image }}'"
           echo "DEBUG: build-summary.result = '${{ needs.build-summary.result }}'"
           echo "DEBUG: git_tag = '${{ needs.pre-build.outputs.git_tag }}'"
           echo "DEBUG: DOCKERHUB_IMAGE = '${{ env.DOCKERHUB_IMAGE }}'"
@@ -755,10 +936,10 @@ jobs:
           echo "DEBUG: matrix.job.docker_platform = '${{ matrix.job.docker_platform }}'"
           echo "=============================================="
       
-      - name: Start - Docker Build (${{ matrix.job.name }})
+      - name: Start - Docker Base Build (${{ matrix.job.name }})
         run: |
           echo "=============================================="
-          echo "  Starting Docker build for ${{ matrix.job.name }}"
+          echo "  Starting Docker base build for ${{ matrix.job.name }}"
           echo "=============================================="
       
       - name: Checkout - Repository
@@ -815,7 +996,7 @@ jobs:
         continue-on-error: true
       
       # 使用 docker/build-push-action 构建并推送多架构镜像到 Docker Hub 和 GHCR
-      - name: Build - Docker Image
+      - name: Build - Docker Base Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -849,7 +1030,7 @@ jobs:
       - name: Upload - Trivy Scan Results
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-scan-results-${{ matrix.job.name }}
+          name: trivy-scan-results-base-${{ matrix.job.name }}
           path: 'trivy-results.sarif'
           retention-days: 30
       
@@ -858,13 +1039,13 @@ jobs:
         with:
           image: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-${{ matrix.job.name }}'
           format: spdx-json
-          output-file: 'sbom-${{ matrix.job.name }}.spdx.json'
+          output-file: 'sbom-base-${{ matrix.job.name }}.spdx.json'
       
       - name: Upload - SBOM Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ matrix.job.name }}
-          path: 'sbom-${{ matrix.job.name }}.spdx.json'
+          name: sbom-base-${{ matrix.job.name }}
+          path: 'sbom-base-${{ matrix.job.name }}.spdx.json'
           retention-days: 90
       
       - name: Install - Cosign
@@ -879,38 +1060,215 @@ jobs:
         id: docker-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "P6 - Docker Build (${{ matrix.job.name }}): PASSED"
+          echo "P7a - Docker Base Build (${{ matrix.job.name }}): PASSED"
       
-      - name: Complete - Docker Build (${{ matrix.job.name }})
+      - name: Complete - Docker Base Build (${{ matrix.job.name }})
         run: |
           echo "=============================================="
-          echo "  Docker build completed successfully"
+          echo "  Docker base build completed successfully"
           echo "=============================================="
 
   # ================================================================================
-  # P8 - Docker Manifest
+  # P7b - Docker 拓展镜像构建
   # ================================================================================
-  # 功能: Docker多架构Manifest创建
+  # 功能: Docker拓展镜像构建（多架构并行）
   # 输入: pre-build.git_tag
   # 输出: status
-  # 执行条件: should_deploy == 'true' && docker-build.result == 'success'
-  # 依赖: pre-build, docker-build
+  # 执行条件: should_build_extended_image == 'true' && needs.build-summary.result == 'success'
+  # 依赖: pre-build, build-summary
+  # 并行: amd64, arm64v8, armv7 (最多5个并行)
   # ================================================================================
-  docker-manifest:
-    name: P8 - Docker Manifest
+  docker-build-extended:
+    name: P7b - Docker Extended (${{ matrix.job.name }})
     needs: 
       - pre-build
-      - docker-build
+      - build-summary
+    if: ${{ needs.pre-build.outputs.should_build_extended_image == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
     runs-on: ubuntu-latest
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.docker-build.result != 'failure' && needs.docker-build.outputs.status == 'success' }}
+    outputs:
+      status: ${{ steps.docker-status.outputs.status }}
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        job:
+          - { name: "amd64",   docker_platform: "linux/amd64" }
+          - { name: "arm64v8", docker_platform: "linux/arm64" }
+          - { name: "armv7",   docker_platform: "linux/arm/v7" }
+    
+    steps:
+      - name: Debug - Check Variables
+        run: |
+          echo "=============================================="
+          echo "         Docker Extended Build Debug Information"
+          echo "=============================================="
+          echo "DEBUG: should_build_extended_image = '${{ needs.pre-build.outputs.should_build_extended_image }}'"
+          echo "DEBUG: build-summary.result = '${{ needs.build-summary.result }}'"
+          echo "DEBUG: git_tag = '${{ needs.pre-build.outputs.git_tag }}'"
+          echo "DEBUG: DOCKERHUB_IMAGE = '${{ env.DOCKERHUB_IMAGE }}'"
+          echo "DEBUG: GHCR_IMAGE = '${{ env.GHCR_IMAGE }}'"
+          echo "DEBUG: LATEST_TAG = '${{ env.LATEST_TAG }}'"
+          echo "DEBUG: matrix.job.name = '${{ matrix.job.name }}'"
+          echo "DEBUG: matrix.job.docker_platform = '${{ matrix.job.docker_platform }}'"
+          echo "=============================================="
+      
+      - name: Start - Docker Extended Build (${{ matrix.job.name }})
+        run: |
+          echo "=============================================="
+          echo "  Starting Docker extended build for ${{ matrix.job.name }}"
+          echo "=============================================="
+      
+      - name: Checkout - Repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      
+      - name: Set - Version Variables
+        run: |
+          GIT_TAG="${{ needs.pre-build.outputs.git_tag || 'dev-unknown' }}"
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_ENV
+          echo "DEBUG: GIT_TAG set to $GIT_TAG"
+      
+      - name: Validate - GIT_TAG Environment Variable
+        run: |
+          if [ -z "${{ env.GIT_TAG }}" ] || [ "${{ env.GIT_TAG }}" = "dev-unknown" ]; then
+            echo "Error: GIT_TAG environment variable is not properly set"
+            exit 1
+          fi
+          echo "GIT_TAG validation passed: ${{ env.GIT_TAG }}"
+      
+      - name: Download - Build Artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: binaries-linux-${{ matrix.job.name }}
+          path: artifacts
+      
+      - name: Prepare - Docker Rootfs
+        run: |
+          mkdir -p commercial/docker/rootfs/usr/bin
+          cp artifacts/rustdesk-pro commercial/docker/rootfs/usr/bin/
+          chmod +x commercial/docker/rootfs/usr/bin/*
+      
+      - name: Setup - QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Setup - Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login - GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      
+      - name: Login - Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        continue-on-error: true
+      
+      # 使用 docker/build-push-action 构建并推送多架构镜像到 Docker Hub 和 GHCR
+      # 使用 Dockerfile.extended 构建拓展镜像
+      - name: Build - Docker Extended Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./commercial/docker/Dockerfile.extended
+          platforms: ${{ matrix.job.docker_platform }}
+          push: true
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-extended-${{ matrix.job.name }}
+            ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-extended-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-extended-${{ matrix.job.name }}
+            ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-extended-${{ matrix.job.name }}
+      
+      - name: Verify - Docker Image Push
+        run: |
+          echo "Verifying Docker image push..."
+          docker manifest inspect ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-${{ matrix.job.name }} || echo "Warning: Image verification failed but push may have succeeded"
+          echo "Docker image push completed"
+      
+      - name: Scan - Docker Image Vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-${{ matrix.job.name }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+      
+      - name: Upload - Trivy Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-results-extended-${{ matrix.job.name }}
+          path: 'trivy-results.sarif'
+          retention-days: 30
+      
+      - name: Generate - SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: '${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-${{ matrix.job.name }}'
+          format: spdx-json
+          output-file: 'sbom-extended-${{ matrix.job.name }}.spdx.json'
+      
+      - name: Upload - SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-extended-${{ matrix.job.name }}
+          path: 'sbom-extended-${{ matrix.job.name }}.spdx.json'
+          retention-days: 90
+      
+      - name: Install - Cosign
+        uses: sigstore/cosign-installer@v3
+      
+      - name: Sign - Docker Image
+        run: |
+          cosign sign --yes ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-${{ matrix.job.name }} || echo "Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
+          cosign sign --yes ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-extended-${{ matrix.job.name }} || echo "Image signing skipped (COSIGN_PRIVATE_KEY not configured)"
+      
+      - name: Report - Docker Build Status
+        id: docker-status
+        run: |
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "P7b - Docker Extended Build (${{ matrix.job.name }}): PASSED"
+      
+      - name: Complete - Docker Extended Build (${{ matrix.job.name }})
+        run: |
+          echo "=============================================="
+          echo "  Docker extended build completed successfully"
+          echo "=============================================="
+
+  # ================================================================================
+  # P8a - Docker Manifest (基础镜像)
+  # ================================================================================
+  # 功能: Docker多架构Manifest创建（基础镜像）
+  # 输入: pre-build.git_tag
+  # 输出: status
+  # 执行条件: should_build_base_image == 'true' && docker-build-base.result == 'success'
+  # 依赖: pre-build, docker-build-base
+  # ================================================================================
+  docker-manifest-base:
+    name: P8a - Docker Manifest (Base)
+    needs: 
+      - pre-build
+      - docker-build-base
+    runs-on: ubuntu-latest
+    if: ${{ needs.pre-build.outputs.should_build_base_image == 'true' && needs.docker-build-base.result != 'failure' && needs.docker-build-base.outputs.status == 'success' }}
     outputs:
       status: ${{ steps.manifest-status.outputs.status }}
     
     steps:
-      - name: Start - Manifest Creation
+      - name: Start - Manifest Creation (Base)
         run: |
           echo "=============================================="
-          echo "    Creating multi-arch Docker manifests      "
+          echo "    Creating multi-arch Docker manifests (Base)"
           echo "=============================================="
       
       - name: Checkout - Repository
@@ -936,56 +1294,122 @@ jobs:
           username: changsongyang
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Create - Docker Hub Version Manifest
+      - name: Create - Docker Hub Version Manifest (Base)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
-      - name: Create - Docker Hub Latest Manifest
+      - name: Create - Docker Hub Latest Manifest (Base)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}
           extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-armv7
           push: true
       
-      - name: Create - GHCR Version Manifest
+      - name: Create - GHCR Version Manifest (Base)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-armv7
           push: true
       
-      - name: Create - GHCR Latest Manifest
+      - name: Create - GHCR Latest Manifest (Base)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
           base-image: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}
           extra-images: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-amd64,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-armv7
           push: true
       
-      - name: Report - Manifest Status
+      - name: Report - Manifest Status (Base)
         id: manifest-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "P7 - Docker Manifest: PASSED"
-      
-      - name: Complete - Docker Manifest
+          echo "P8a - Docker Manifest (Base): PASSED"
+
+  # ================================================================================
+  # P8b - Docker Manifest (拓展镜像)
+  # ================================================================================
+  # 功能: Docker多架构Manifest创建（拓展镜像）
+  # 输入: pre-build.git_tag
+  # 输出: status
+  # 执行条件: should_build_extended_image == 'true' && docker-build-extended.result == 'success'
+  # 依赖: pre-build, docker-build-extended
+  # ================================================================================
+  docker-manifest-extended:
+    name: P8b - Docker Manifest (Extended)
+    needs: 
+      - pre-build
+      - docker-build-extended
+    runs-on: ubuntu-latest
+    if: ${{ needs.pre-build.outputs.should_build_extended_image == 'true' && needs.docker-build-extended.result != 'failure' && needs.docker-build-extended.outputs.status == 'success' }}
+    outputs:
+      status: ${{ steps.manifest-status.outputs.status }}
+    
+    steps:
+      - name: Start - Manifest Creation (Extended)
         run: |
           echo "=============================================="
-          echo "     CD Pipeline Completed Successfully       "
+          echo "    Creating multi-arch Docker manifests (Extended)"
           echo "=============================================="
-          echo "All stages passed:"
-          echo "- P1 Pre-Build: PASSED"
-          echo "- P2 Code Quality: PASSED"
-          echo "- P3 Build: PASSED"
-          echo "- P4 Validation: PASSED"
-          echo "- P5 Packaging: PASSED"
-          echo "- P6 Release: PASSED"
-          echo "- P7 Docker Build: PASSED"
-          echo "- P8 Docker Manifest: PASSED"
-          echo "=============================================="
-          echo "Deployment completed successfully!"
+      
+      - name: Checkout - Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Set - Version Variables
+        run: |
+          echo "GIT_TAG=${{ needs.pre-build.outputs.git_tag }}" >> $GITHUB_ENV
+          echo "DEBUG: GIT_TAG set to ${{ needs.pre-build.outputs.git_tag }}"
+      
+      - name: Login - Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      
+      - name: Login - GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: changsongyang
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create - Docker Hub Version Manifest (Extended)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.GIT_TAG }}-extended-armv7
+          push: true
+      
+      - name: Create - Docker Hub Latest Manifest (Extended)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-armv7
+          push: true
+      
+      - name: Create - GHCR Version Manifest (Extended)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-extended
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-extended-amd64,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-extended-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.GIT_TAG }}-extended-armv7
+          push: true
+      
+      - name: Create - GHCR Latest Manifest (Extended)
+        uses: Noelware/docker-manifest-action@0.4.3
+        with:
+          base-image: ${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}
+          extra-images: ${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-amd64,${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-armv7
+          push: true
+      
+      - name: Report - Manifest Status (Extended)
+        id: manifest-status
+        run: |
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "P8b - Docker Manifest (Extended): PASSED"
 
   # ================================================================================
   # P9 - 部署汇总
@@ -994,15 +1418,17 @@ jobs:
   # 输入: pre-build.git_tag, pre-build.build_id
   # 输出: 无
   # 执行条件: should_deploy == 'true' (always执行)
-  # 依赖: pre-build, github-release, docker-manifest
+  # 依赖: pre-build, build-summary, deb-package, github-release, docker-manifest-*
   # ================================================================================
   deploy-summary:
     name: P9 - Deployment Summary
     needs: 
       - pre-build
       - build-summary
+      - deb-package
       - github-release
-      - docker-manifest
+      - docker-manifest-base
+      - docker-manifest-extended
     runs-on: ubuntu-22.04
     if: ${{ always() && needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
     continue-on-error: true
@@ -1029,10 +1455,15 @@ jobs:
           echo "[PASS] GHCR:           Completed"
           echo "[PASS] Multi-arch:     Completed"
           echo "----------------------------------------------"
-          echo "Docker Images:"
+          echo "Docker Base Images:"
           echo "  - ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}"
           echo "  - ${{ env.DOCKERHUB_IMAGE }}:latest"
           echo "  - ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}"
           echo "  - ${{ env.GHCR_IMAGE }}:latest"
+          echo "Docker Extended Images:"
+          echo "  - ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-extended"
+          echo "  - ${{ env.DOCKERHUB_IMAGE }}:extended-latest"
+          echo "  - ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-extended"
+          echo "  - ${{ env.GHCR_IMAGE }}:extended-latest"
           echo "=============================================="
           echo "Deployment completed successfully!"
