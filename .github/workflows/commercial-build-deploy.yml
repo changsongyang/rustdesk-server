@@ -543,7 +543,7 @@ jobs:
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result != 'failure' }}
     outputs:
       status: ${{ steps.package-status.outputs.status }}
     strategy:
@@ -645,7 +645,7 @@ jobs:
       - pre-build
       - build-summary
     runs-on: ubuntu-22.04
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result != 'failure' }}
     outputs:
       status: ${{ steps.release-status.outputs.status }}
     
@@ -723,7 +723,7 @@ jobs:
     needs: 
       - pre-build
       - build-summary
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result == 'success' }}
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.result != 'failure' }}
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.docker-status.outputs.status }}
@@ -897,7 +897,7 @@ jobs:
       - pre-build
       - docker-build
     runs-on: ubuntu-latest
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.docker-build.result == 'success' }}
+    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.docker-build.result != 'failure' }}
     outputs:
       status: ${{ steps.manifest-status.outputs.status }}
     
@@ -998,7 +998,7 @@ jobs:
       - github-release
       - docker-manifest
     runs-on: ubuntu-22.04
-    if: ${{ always() && needs.pre-build.outputs.should_deploy == 'true' && needs.github-release.result != 'skipped' && needs.docker-manifest.result != 'skipped' }}
+    if: ${{ always() && needs.pre-build.outputs.should_deploy == 'true' }}
     
     steps:
       - name: Display - Deployment Summary
