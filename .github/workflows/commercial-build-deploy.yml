@@ -448,7 +448,9 @@ jobs:
           echo "=============================================="
           echo "    Artifact Directory Before Download         "
           echo "=============================================="
-          ls -la /home/runner/work/rustdesk-server/rustdesk-server/
+          echo "GITHUB_WORKSPACE: ${{ github.workspace }}"
+          echo "Current directory: $(pwd)"
+          ls -la .
           echo "=============================================="
       
       - name: Download - All Artifacts
