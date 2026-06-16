@@ -205,8 +205,18 @@ jobs:
           VERSION=${T#pro-v}
           VERSION=${VERSION#pro-}
           VERSION=${VERSION#v}
-          echo "deb_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "DEB_VERSION=$VERSION" >> $GITHUB_ENV
+          
+          # Debian 包版本必须以数字开头
+          # 如果版本以非数字开头（如 dev-），转换为有效格式
+          if [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            DEBIAN_VERSION="0.0.$(date +%Y%m%d%H%M%S).${GITHUB_SHA::8}"
+            echo "[INFO] Converted to valid Debian version: $DEBIAN_VERSION"
+          else
+            DEBIAN_VERSION="$VERSION"
+          fi
+          
+          echo "deb_version=$DEBIAN_VERSION" >> $GITHUB_OUTPUT
+          echo "DEB_VERSION=$DEBIAN_VERSION" >> $GITHUB_ENV
 
       # 判断构建类型: prod 或 dev
       - name: Determine - Build Type
