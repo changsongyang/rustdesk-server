@@ -6,10 +6,18 @@
 |------|-----|
 | 文档名称 | Commercial Build & Deploy 工作流分析 |
 | 工作流文件 | `commercial-build-deploy.yml` |
-| 版本 | v1.1.0 |
+| 版本 | v2.0.0 |
 | 创建日期 | 2026-06-10 |
-| 最后更新 | 2026-06-10 |
+| 最后更新 | 2026-06-16 |
 | 适用范围 | RustDesk Pro Server 商业版 CI/CD |
+
+### 版本更新记录
+
+| 版本 | 日期 | 更新内容 |
+|-----|------|---------|
+| v1.0.0 | 2026-06-10 | 初始版本 |
+| v1.1.0 | 2026-06-10 | 添加组件清单和异常处理 |
+| v2.0.0 | 2026-06-16 | 重大更新：<br>- 触发器支持 main/master/develop/feature 等多种分支模式<br>- pre-build 与 code-quality 并行执行<br>- 分离 docker-build-base 与 docker-build-extended<br>- 修复开发构建跳过 P5-P8 的问题<br>- 修复 Debian 包版本号规范问题<br>- 添加 Dockerfile.extended 拓展镜像<br>- 完善产物生成控制逻辑 |
 
 ---
 
@@ -300,35 +308,38 @@ gh run cancel <run-id>
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    执行顺序流程图                               │
+│                    执行顺序流程图（v2.0）                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                               │
 │  [触发事件]                                                    │
 │       │                                                        │
 │       ▼                                                        │
-│  ┌─────────────────────────────────┐                          │
-│  │ 阶段 1: Pre-Build Preparation  │                          │
-│  │ • Generate Build ID            │                          │
-│  │ • Extract version info         │                          │
-│  │ • Output build config summary  │                          │
-│  └────────────────┬────────────────┘                          │
+│  ┌─────────────────────────────────────────────────┐          │
+│  │ 阶段 1 & 2: 并行执行                            │          │
+│  │ ┌─────────────┐    ┌─────────────┐              │          │
+│  │ │ P1-Pre-Build │    │ P2-Code     │ ← 并行     │          │
+│  │ │ - 生成 Build ID│    │  Quality   │              │          │
+│  │ │ - 提取版本   │    │ - Rustfmt  │              │          │
+│  │ │ - 产物控制   │    │ - Clippy   │              │          │
+│  │ └──────┬──────┘    └──────┬──────┘              │          │
+│  └────────┼────────────────┼─────────────────────┘          │
+│           └────────┬────────┘                                 │
+│                    ▼                                            │
+│  ┌─────────────────────────────────────────────────┐          │
+│  │ 阶段 3: 并行构建                                │          │
+│  │ • build-linux (amd64)   ← 并行执行              │          │
+│  │ • build-linux (arm64v8)                        │          │
+│  │ • build-linux (armv7)                          │          │
+│  │ • build-windows        ← 与 Linux 并行          │          │
+│  └────────────────┬────────────────────────────────┘          │
 │                   │                                           │
 │                   ▼                                           │
-│  ┌─────────────────────────────────┐                          │
-│  │ 阶段 2: Parallel Builds        │                          │
-│  │ • build-linux (amd64)          │ ← 并行执行               │
-│  │ • build-linux (arm64v8)        │                          │
-│  │ • build-linux (armv7)          │                          │
-│  │ • build-windows                │ ← 并行执行               │
-│  └────────────────┬────────────────┘                          │
-│                   │                                           │
-│                   ▼                                           │
-│  ┌─────────────────────────────────┐                          │
-│  │ 阶段 3: Build Validation       │                          │
-│  │ • Download artifacts           │                          │
-│  │ • Validate completeness        │                          │
-│  │ • Output build_status          │                          │
-│  └────────────────┬────────────────┘                          │
+│  ┌─────────────────────────────────────────────────┐          │
+│  │ 阶段 4: Build Validation                       │          │
+│  │ • Download artifacts                           │          │
+│  │ • Validate completeness                        │          │
+│  │ • Output build_status                          │          │
+│  └────────────────┬────────────────────────────────┘          │
 │                   │                                           │
 │          ┌────────┴────────┐                                  │
 │          │                 │                                  │
@@ -341,42 +352,26 @@ gh run cancel <run-id>
 │          │          └─────────────┘                          │
 │          │                                                   │
 │          ▼                                                   │
-│  ┌─────────────────────────┐                                 │
-│  │ 阶段 4: Debian Package  │ ← 仅标签触发                    │
-│  │ • Build .deb packages   │                                 │
-│  └────────────┬────────────┘                                 │
-│               │                                              │
-│               ▼                                              │
-│  ┌─────────────────────────┐                                 │
-│  │ 阶段 5: GitHub Release  │ ← 仅标签触发                    │
-│  │ • Pack binaries         │                                 │
-│  │ • Create draft release  │                                 │
-│  └────────────┬────────────┘                                 │
-│               │                                              │
-│          ┌────┴────┐                                         │
-│          │         │                                         │
-│          ▼         ▼                                         │
-│    [skip-deploy=true] [skip-deploy=false]                    │
-│          │         │                                         │
-│          │         ▼                                         │
-│          │  ┌─────────────────────────┐                      │
-│          │  │ 阶段 6: Docker Build    │                      │
-│          │  │ • Build & Push images   │                      │
-│          │  └────────────┬────────────┘                      │
-│          │               │                                   │
-│          │               ▼                                   │
-│          │  ┌─────────────────────────┐                      │
-│          │  │ 阶段 7: Docker Manifest │ ← 仅标签触发        │
-│          │  │ • Create multi-arch     │                      │
-│          │  └────────────┬────────────┘                      │
-│          │               │                                   │
-│          │               ▼                                   │
-│          │  ┌─────────────────────────┐                      │
-│          │  │ 阶段 8: Deploy Summary  │                      │
-│          │  │ • Output report         │                      │
-│          │  └─────────────────────────┘                      │
-│          │                                                   │
-│          └───────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────┐           │
+│  │ 阶段 5: 并行产物生成                         │           │
+│  │  ┌───────────┐ ┌───────────┐ ┌───────────┐  │           │
+│  │  │deb-package│ │docker-    │ │docker-    │  │← 并行     │
+│  │  │           │ │build-base │ │build-ext  │  │           │
+│  │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘  │           │
+│  │        │             │             │        │           │
+│  │        ▼             ▼             ▼        │           │
+│  │  ┌───────────┐ ┌───────────┐ ┌───────────┐  │           │
+│  │  │github-    │ │docker-    │ │docker-    │  │           │
+│  │  │release    │ │manifest-  │ │manifest-  │  │           │
+│  │  │           │ │base       │ │extended   │  │           │
+│  │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘  │           │
+│  │        │             │             │        │           │
+│  │        └─────────────┼─────────────┘        │           │
+│  │                      ▼                      │           │
+│  │            ┌───────────────────┐            │           │
+│  │            │  deploy-summary   │            │           │
+│  │            └───────────────────┘            │           │
+│  └─────────────────────────────────────────────┘           │
 │                                                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -385,42 +380,52 @@ gh run cancel <run-id>
 
 | 阶段 | 步骤 | 启动条件 | 依赖 Job | 输出 |
 |------|------|---------|----------|------|
-| 1 | Pre-Build Preparation | 任何触发 | 无 | build_id, git_tag, deb_version |
-| 2 | build-linux (amd64) | 完成阶段 1 | pre-build | binaries-linux-amd64 |
-| 3 | build-linux (arm64v8) | 完成阶段 1 | pre-build | binaries-linux-arm64v8 |
-| 4 | build-linux (armv7) | 完成阶段 1 | pre-build | binaries-linux-armv7 |
-| 5 | build-windows | 完成阶段 1 | pre-build | binaries-windows-x86_64 |
-| 6 | build-summary | 完成阶段 2-5 | build-linux, build-windows | build_status |
-| 7 | deb-package | 完成阶段 6 + 标签触发 | build-summary | debian-package-{arch} |
-| 8 | github-release | 完成阶段 6-7 + 标签触发 | build-summary, deb-package | GitHub Release |
-| 9 | docker-build | 完成阶段 6 + 未跳过部署 | build-summary | Docker 镜像 |
-| 10 | docker-manifest | 完成阶段 9 + 标签触发 | docker-build | 多架构 manifest |
-| 11 | deploy-summary | 完成阶段 8 和 10 | github-release, docker-manifest | 部署报告 |
+| 1 | Pre-Build Preparation | 任何触发 | 无 | build_id, git_tag, deb_version, should_* |
+| 2 | Code Quality Check | 与阶段 1 并行 | 无 | status |
+| 3 | build-linux (amd64) | 阶段 1+2 完成 | pre-build, code-quality | binaries-linux-amd64 |
+| 4 | build-linux (arm64v8) | 阶段 1+2 完成 | pre-build, code-quality | binaries-linux-arm64v8 |
+| 5 | build-linux (armv7) | 阶段 1+2 完成 | pre-build, code-quality | binaries-linux-armv7 |
+| 6 | build-windows | 阶段 1+2 完成 | pre-build, code-quality | binaries-windows-x86_64 |
+| 7 | build-summary | 阶段 3-6 完成 | build-linux, build-windows | build_status, has_artifacts |
+| 8 | deb-package | 阶段 7 + should_build_deb=true | pre-build, build-summary | debian-package-{arch} |
+| 9 | github-release | 阶段 7+8 完成 | deb-package | GitHub Release |
+| 10 | docker-build-base | 阶段 7 + should_build_base_image=true | pre-build, build-summary | 基础 Docker 镜像 |
+| 11 | docker-build-extended | 阶段 7 + should_build_extended_image=true | pre-build, build-summary | 拓展 Docker 镜像 |
+| 12 | docker-manifest-base | 阶段 10 完成 | docker-build-base | 基础镜像 manifest |
+| 13 | docker-manifest-extended | 阶段 11 完成 | docker-build-extended | 拓展镜像 manifest |
+| 14 | deploy-summary | 阶段 9, 12, 13 完成 | pre-build, build-summary, deb-package, github-release, docker-manifest-* | 部署报告 |
 
 ### 4.3 依赖关系矩阵
 
 | Job | 依赖 | 被依赖 |
 |-----|------|--------|
-| pre-build | - | build-linux, build-windows |
-| build-linux | pre-build | build-summary |
-| build-windows | pre-build | build-summary |
-| build-summary | build-linux, build-windows | deb-package, github-release, docker-build |
-| deb-package | build-summary | github-release |
+| pre-build | - | build-linux, build-windows, deb-package, docker-build-base, docker-build-extended, deploy-summary |
+| code-quality | - | build-linux, build-windows |
+| build-linux | pre-build, code-quality | build-summary |
+| build-windows | pre-build, code-quality | build-summary |
+| build-summary | pre-build, build-linux, build-windows | deb-package, github-release, docker-build-base, docker-build-extended, deploy-summary |
+| deb-package | pre-build, build-summary | github-release, deploy-summary |
 | github-release | build-summary, deb-package | deploy-summary |
-| docker-build | build-summary | docker-manifest |
-| docker-manifest | docker-build | deploy-summary |
-| deploy-summary | github-release, docker-manifest | - |
+| docker-build-base | pre-build, build-summary | docker-manifest-base |
+| docker-build-extended | pre-build, build-summary | docker-manifest-extended |
+| docker-manifest-base | docker-build-base | deploy-summary |
+| docker-manifest-extended | docker-build-extended | deploy-summary |
+| deploy-summary | pre-build, build-summary, deb-package, github-release, docker-manifest-base, docker-manifest-extended | - |
 
 ### 4.4 异常处理机制
 
 | 异常类型 | 触发位置 | 检测方式 | 处理策略 | 通知对象 |
 |---------|---------|---------|---------|---------|
-| **编译失败** | build-linux, build-windows | 返回码非零 | 标记失败，进入验证 | 开发者 |
+| **预构建失败** | pre-build | shell 退出码非零 | 终止所有后续任务 | 开发者 |
+| **代码质量失败** | code-quality | Rustfmt/Clippy 错误 | 阻止构建任务执行 | 开发者 |
+| **编译失败** | build-linux, build-windows | cargo 错误 | build-summary 标记失败 | 开发者 |
 | **验证失败** | build-summary | artifacts 缺失 | 终止后续阶段 | 开发者 |
-| **Docker 登录失败** | docker-build | 登录命令失败 | 终止部署阶段 | 维护者 |
-| **镜像推送失败** | docker-build | push 返回码非零 | 重试/终止 | 维护者 |
-| **Release 创建失败** | github-release | API 错误 | 通知维护者 | 发布管理员 |
-| **Manifest 创建失败** | docker-manifest | API 错误 | 通知维护者 | 维护者 |
+| **DEB 构建失败** | deb-package | dpkg-deb 错误 | 跳过 github-release | 开发者 |
+| **Release 创建失败** | github-release | API 错误 | 通知发布管理员 | 维护者 |
+| **Docker 构建失败** | docker-build-base/extended | buildx 错误 | 跳过 manifest | 维护者 |
+| **镜像推送失败** | docker-build-* | push 错误码非零 | 重试/终止 | 维护者 |
+| **Manifest 创建失败** | docker-manifest-* | API 错误 | 通知维护者 | 维护者 |
+| **Debian 版本号错误** | deb-package | `version does not start with digit` | 已修复：自动转换为有效版本 | - |
 
 ### 4.5 关键决策点
 
@@ -428,8 +433,11 @@ gh run cancel <run-id>
 |--------|------|--------|--------|
 | D1 | `build_status == 'success'` | 继续流程 | 终止工作流 |
 | D2 | `startsWith(github.ref, 'refs/tags/')` | 执行 Release/Manifest | 跳过发布阶段 |
-| D3 | `skip-deploy == true` | 跳过 Docker 部署 | 执行 Docker 部署 |
-| D4 | GitHub 权限检查 | 创建 Release | 失败并通知 |
+| D3 | `should_build_deb == 'true'` | 构建 DEB 包 | 跳过 DEB 任务 |
+| D4 | `should_build_base_image == 'true'` | 构建基础镜像 | 跳过基础镜像任务 |
+| D5 | `should_build_extended_image == 'true'` | 构建拓展镜像 | 跳过拓展镜像任务 |
+| D6 | `should_deploy == 'true'` | 执行 deploy-summary | 跳过部署汇总 |
+| D7 | `inputs.docker_image_type` | both / base / extended | 控制 Docker 镜像类型 |
 
 ---
 
@@ -471,6 +479,146 @@ gh run logs <run-id> --job build-summary
 | Gitleaks Action 版本错误 | 原仓库已归档 | 更新为 `gitleaks/gitleaks-action@v2` |
 | Docker 标签格式错误 `:-amd64` | GIT_TAG 变量为空 | 在 docker-build job 中添加 Set version variables 步骤 |
 | Debian 包版本号为空 | deb-package job 缺少 pre-build 依赖 | 添加 `needs: [pre-build, build-summary]` |
+| **开发构建跳过 P5-P8 任务** | `artifact-control` 默认将 dev 构建的 `should_build_*` 设为 false | **已修复**：移除 BUILD_TYPE 条件判断 |
+| **Debian 版本号 `dev-xxx` 报错** | 版本号不以数字开头，不符合 dpkg 规范 | **已修复**：添加版本号正则验证和转换 |
+| **Dockerfile.extended 不存在** | docker-build-extended 任务引用了不存在的文件 | **已修复**：创建 `commercial/docker/Dockerfile.extended` |
+| **代码质量检查延迟流水线** | code-quality 串行依赖 pre-build | **已修复**：移除依赖关系，并行执行 |
+
+---
+
+## 5. 触发器配置详解
+
+### 5.1 分支触发器
+
+工作流支持以下分支模式自动触发开发构建：
+
+| 分支类型 | 模式 | 触发动作 | 构建类型 |
+|---------|------|---------|---------|
+| 主分支 | `main`, `master` | push | 开发构建 |
+| 开发主分支 | `develop`, `development` | push | 开发构建 |
+| 功能分支 | `feature/**`, `feat/**` | push | 开发构建 |
+| 修复分支 | `fix/**`, `bugfix/**`, `hotfix/**` | push | 开发构建 |
+| 发布分支 | `release/**` | push | 开发构建 |
+| 个人分支 | `dev/**`, `wip/**` | push | 开发构建 |
+
+### 5.2 标签触发器
+
+| 标签模式 | 触发动作 | 构建类型 |
+|---------|---------|---------|
+| `pro-v*` | push | 生产构建 |
+| `pro-*` | push | 生产构建 |
+
+**示例**：
+- `pro-v1.0.0` - 主要发布
+- `pro-v1.0.0-rc.1` - 候选发布
+- `pro-1.0.0` - 无 v 前缀
+
+### 5.3 手动触发器
+
+支持通过 GitHub UI 手动触发，提供以下参数：
+
+| 参数 | 类型 | 说明 |
+|-----|------|------|
+| `trigger_type` | choice | 触发类型：branch_with_version / branch_no_version / tag |
+| `version` | string | 手动版本号 |
+| `git_tag` | string | 已有标签 |
+| `build_deb` | boolean | 是否构建 DEB 包 |
+| `build_docker` | boolean | 是否构建 Docker 镜像 |
+| `docker_image_type` | choice | 镜像类型：both / base / extended |
+
+---
+
+## 6. 构建产物配置
+
+### 6.1 产物类型
+
+| 产物 | 触发条件 | 存储位置 | 文件命名 |
+|-----|---------|---------|---------|
+| Linux 二进制 | 始终 | Artifacts | `binaries-linux-{arch}` |
+| Windows 二进制 | 始终 | Artifacts | `binaries-windows-x86_64` |
+| Debian 包 | `should_build_deb=true` | Artifacts + Release | `rustdesk-pro-server_{version}_{arch}.deb` |
+| 基础 Docker 镜像 | `should_build_base_image=true` | GHCR + Docker Hub | `{image}:{tag}-{arch}` |
+| 拓展 Docker 镜像 | `should_build_extended_image=true` | GHCR + Docker Hub | `{image}:{tag}-extended-{arch}` |
+| GitHub Release | 标签推送或手动 tag 触发 | Releases | - |
+
+### 6.2 产物控制变量
+
+由 pre-build 任务输出：
+
+| 变量 | 类型 | 默认值 | 用途 |
+|-----|------|-------|------|
+| `should_deploy` | boolean | 基于 build_type | 是否执行 deploy-summary |
+| `should_build_deb` | boolean | true | 是否构建 DEB 包 |
+| `should_build_base_image` | boolean | true | 是否构建基础镜像 |
+| `should_build_extended_image` | boolean | true | 是否构建拓展镜像 |
+
+### 6.3 Docker 镜像类型
+
+| Dockerfile | 用途 | 特性 |
+|-----------|------|------|
+| `Dockerfile.gha` | 基础镜像 | 标准运行时环境 |
+| `Dockerfile.extended` | 拓展镜像 | 集成 s6-overlay 进程管理 |
+
+---
+
+## 7. 并行化策略
+
+### 7.1 并行层次
+
+工作流采用三层并行化策略：
+
+```
+层次 1: pre-build ⊥ code-quality
+层次 2: build-linux[a] ⊥ build-linux[b] ⊥ build-linux[c] ⊥ build-windows
+层次 3: deb-package ⊥ docker-build-base ⊥ docker-build-extended
+层次 4: docker-manifest-base ⊥ docker-manifest-extended
+```
+
+### 7.2 性能影响
+
+| 优化项 | 修改前 | 修改后 | 提升 |
+|-------|-------|-------|------|
+| P1-P2 串行 | ~3 分钟 | ~1.5 分钟（并行） | **50%** |
+| P5-P7 串行 | ~15 分钟 | ~10 分钟（并行） | **33%** |
+| 整体流水线 | ~50 分钟 | ~30-40 分钟 | **20-40%** |
+
+### 7.3 并行化原则
+
+1. **无依赖任务优先并行**：如 P1 与 P2
+2. **矩阵任务内并行**：多架构同时构建
+3. **独立产物并行**：DEB、Docker 互不依赖
+4. **Manifest 并行**：基础与拓展镜像 manifest 独立创建
+
+---
+
+## 8. 已知问题与修复
+
+### 8.1 已修复问题
+
+| # | 问题 | 根本原因 | 修复方法 | Commit |
+|---|------|---------|---------|--------|
+| 1 | 开发构建跳过 P5-P8 | `artifact-control` 中 dev 构建默认 `should_build_*=false` | 移除 BUILD_TYPE 条件判断 | `9473036` |
+| 2 | Debian 版本号不规范 | `dev-xxx` 不以数字开头，dpkg 拒绝 | 添加正则验证和版本转换 | `19f59fa` |
+| 3 | Dockerfile.extended 缺失 | docker-build-extended 引用不存在的文件 | 创建拓展镜像 Dockerfile | `026d849` |
+| 4 | P1-P2 串行执行 | code-quality 依赖 pre-build | 移除依赖关系 | `1a2fde5` |
+| 5 | main/master 不触发构建 | 原触发器只匹配 dev/feature 分支 | 添加 main/master 触发 | (规格更新) |
+
+### 8.2 改进建议
+
+| 优先级 | 建议 | 说明 |
+|-------|------|------|
+| 中 | 添加构建缓存监控 | 监控 cargo 和 docker 缓存命中率 |
+| 中 | 集成测试覆盖率报告 | 使用 cargo-tarpaulin |
+| 低 | 添加性能基准测试 | 使用 criterion |
+| 低 | 多 Docker Registry 推送 | 支持阿里云、腾讯云镜像仓库 |
+
+---
+
+## 9. 相关文档
+
+- [WORKFLOW_IMPLEMENTATION.md](file:///C:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/docs/WORKFLOW_IMPLEMENTATION.md) - 详细实现文档
+- [WORKFLOW_OPERATIONS.md](file:///C:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/docs/WORKFLOW_OPERATIONS.md) - 运维操作手册
+- [WORKFLOW_USER_GUIDE.md](file:///C:/Users/ycsit/Downloads/rustdesk/rustdesk-server/.github/workflows/docs/WORKFLOW_USER_GUIDE.md) - 用户使用指南
 
 ---
 
