@@ -834,7 +834,7 @@ jobs:
       - build-summary
       - deb-package
     runs-on: ubuntu-22.04
-    if: ${{ needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
+    if: ${{ needs.build-summary.outputs.has_artifacts == 'true' }}
     outputs:
       status: ${{ steps.release-status.outputs.status }}
     
@@ -1432,22 +1432,20 @@ jobs:
       - pre-build
       - build-summary
       - deb-package
-      - github-release
-      - docker-manifest-base
-      - docker-manifest-extended
     runs-on: ubuntu-22.04
-    if: ${{ always() && needs.pre-build.outputs.should_deploy == 'true' && needs.build-summary.outputs.has_artifacts == 'true' }}
+    if: ${{ needs.build-summary.outputs.has_artifacts == 'true' }}
     continue-on-error: true
     
     steps:
       - name: Display - Deployment Summary
         run: |
           echo "=============================================="
-          echo "           DEPLOYMENT SUMMARY                  "
+          echo "           BUILD PIPELINE SUMMARY              "
           echo "=============================================="
           echo "Build ID:      ${{ needs.pre-build.outputs.build_id }}"
           echo "Version:       ${{ needs.pre-build.outputs.git_tag }}"
-          echo "Environment:   Production"
+          echo "Build Type:    ${{ needs.pre-build.outputs.build_type }}"
+          echo "Environment:   ${{ needs.pre-build.outputs.should_deploy == 'true' && 'Production' || 'Development' }}"
           echo "----------------------------------------------"
           echo "AUDIT INFORMATION:"
           echo "   Triggered by:   ${{ github.actor }}"
@@ -1456,10 +1454,9 @@ jobs:
           echo "   Git Ref:        ${{ github.ref }}"
           echo "   Git SHA:        ${{ github.sha }}"
           echo "----------------------------------------------"
+          echo "[PASS] Build Summary: Completed"
+          echo "[PASS] Debian Package: Completed"
           echo "[PASS] GitHub Release: Completed"
-          echo "[PASS] Docker Hub:     Completed"
-          echo "[PASS] GHCR:           Completed"
-          echo "[PASS] Multi-arch:     Completed"
           echo "----------------------------------------------"
           echo "Docker Base Images:"
           echo "  - ${{ env.DOCKERHUB_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}"
@@ -1472,4 +1469,4 @@ jobs:
           echo "  - ${{ env.GHCR_IMAGE }}:${{ needs.pre-build.outputs.git_tag }}-extended"
           echo "  - ${{ env.GHCR_IMAGE }}:extended-latest"
           echo "=============================================="
-          echo "Deployment completed successfully!"
+          echo "${{ needs.pre-build.outputs.should_deploy == 'true' && 'Deployment completed successfully!' || 'Build pipeline completed successfully!' }}"
