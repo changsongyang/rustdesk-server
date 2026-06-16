@@ -1393,8 +1393,8 @@ jobs:
       - name: Create - Docker Hub Latest Manifest (Extended)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
-          base-image: ${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}
-          extra-images: ${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-amd64,${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-arm64v8,${{ env.DOCKERHUB_IMAGE }}:extended-${{ env.LATEST_TAG }}-armv7
+          base-image: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-extended
+          extra-images: ${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-extended-amd64,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-extended-arm64v8,${{ env.DOCKERHUB_IMAGE }}:${{ env.LATEST_TAG }}-extended-armv7
           push: true
       
       - name: Create - GHCR Version Manifest (Extended)
@@ -1407,8 +1407,8 @@ jobs:
       - name: Create - GHCR Latest Manifest (Extended)
         uses: Noelware/docker-manifest-action@0.4.3
         with:
-          base-image: ${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}
-          extra-images: ${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-amd64,${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-arm64v8,${{ env.GHCR_IMAGE }}:extended-${{ env.LATEST_TAG }}-armv7
+          base-image: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-extended
+          extra-images: ${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-extended-amd64,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-extended-arm64v8,${{ env.GHCR_IMAGE }}:${{ env.LATEST_TAG }}-extended-armv7
           push: true
       
       - name: Report - Manifest Status (Extended)
