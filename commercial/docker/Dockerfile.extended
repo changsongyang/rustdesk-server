@@ -1,0 +1,96 @@
+# RustDesk Pro Server - Dockerfile (Extended Version)
+# ======================================================
+# 适用场景：需要进程管理、日志管理、优雅启停的生产环境
+# 
+# 特性：
+# - 使用 s6-overlay 进行进程管理
+# - 支持优雅启停
+# - 日志管理
+# - 健康检查集成
+# - 不包含构建阶段，使用预编译二进制
+# - 从 rootfs 目录复制已编译的二进制文件
+# 
+# 使用方式：
+# 1. commercial-build-deploy.yml 编译二进制并上传为 artifacts
+# 2. 下载 artifacts 到 commercial/docker/rootfs/usr/bin
+# 3. 使用此 Dockerfile 构建镜像
+# 
+# 构建命令：
+#   docker build -t rustdesk-pro-server:extended -f commercial/docker/Dockerfile.extended .
+
+# ==================== 运行阶段 ====================
+FROM debian:bookworm-slim
+
+LABEL maintainer="RustDesk Team <info@rustdesk.com>"
+LABEL description="RustDesk Pro Server - Extended Version with s6-overlay"
+LABEL version="1.0.0"
+LABEL build-type="github-actions-extended"
+
+# s6-overlay 版本配置
+ARG S6_OVERLAY_VERSION=3.2.0.0
+ARG S6_ARCH=x86_64
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装运行时依赖和 s6-overlay
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        sqlite3 \
+        curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 下载并安装 s6-overlay
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz /tmp
+
+RUN \
+  tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+  tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz && \
+  rm /tmp/s6-overlay*.tar.xz && \
+  ln -s /run /var/run
+
+# 创建非 root 用户（安全最佳实践）
+RUN useradd -m -s /bin/bash rustdesk
+
+# 创建必要目录
+RUN mkdir -p /app/data /app/logs /app/keys && \
+    chown -R rustdesk:rustdesk /app
+
+# 复制二进制文件（从 rootfs 目录，由 GitHub Actions 预先放置）
+COPY commercial/docker/rootfs/usr/bin /usr/bin
+
+# 设置可执行权限
+RUN chmod -v a+x /usr/bin/*
+
+# 复制 s6-overlay 服务配置
+COPY commercial/docker/rootfs /
+
+# 切换到非 root 用户
+USER rustdesk
+
+# 暴露端口
+# 21114: TCP 控制端口
+# 21115: TCP 数据端口
+# 21116: HTTP API 端口
+# 21117: HTTPS API 端口
+# 21118: WebSocket 端口
+# 21119: Relay 端口
+EXPOSE 21114 21115 21116 21117 21118 21119
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:21116/api/version || exit 1
+
+# 环境变量（默认值）
+ENV SERVER_PORT=21116 \
+    SERVER_HOST=0.0.0.0 \
+    DATABASE_URL=sqlite:./data/rustdesk_pro.db \
+    PRO_DB_URL=./data/rustdesk_pro.db \
+    LOG_LEVEL=info
+
+# s6-overlay 入口点
+ENTRYPOINT ["/init"]
