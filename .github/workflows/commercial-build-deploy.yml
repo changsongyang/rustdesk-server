@@ -268,25 +268,13 @@ jobs:
       - name: Determine - Artifact Control
         id: artifact-control
         run: |
-          # 4. 设置 Debian 包生成标志
-          if [[ "${{ env.BUILD_TYPE }}" == "prod" ]]; then
-            # 生产构建：默认构建，除非手动禁用
-            SHOULD_BUILD_DEB="${{ inputs.build_deb || 'true' }}"
-          else
-            # 开发构建：默认不构建，除非手动启用
-            SHOULD_BUILD_DEB="${{ inputs.build_deb || 'false' }}"
-          fi
+          # 设置 Debian 包生成标志（所有构建都生成，除非手动禁用）
+          SHOULD_BUILD_DEB="${{ inputs.build_deb || 'true' }}"
           
-          # 5. 设置 Docker 镜像生成标志
-          if [[ "${{ env.BUILD_TYPE }}" == "prod" ]]; then
-            # 生产构建：默认构建，除非手动禁用
-            SHOULD_BUILD_DOCKER="${{ inputs.build_docker || 'true' }}"
-          else
-            # 开发构建：默认不构建，除非手动启用
-            SHOULD_BUILD_DOCKER="${{ inputs.build_docker || 'false' }}"
-          fi
+          # 设置 Docker 镜像生成标志（所有构建都生成，除非手动禁用）
+          SHOULD_BUILD_DOCKER="${{ inputs.build_docker || 'true' }}"
           
-          # 6. 设置 Docker 镜像类型标志
+          # 设置 Docker 镜像类型标志
           if [[ "$SHOULD_BUILD_DOCKER" == "true" ]]; then
             DOCKER_IMAGE_TYPE="${{ inputs.docker_image_type || 'both' }}"
             case "$DOCKER_IMAGE_TYPE" in
