@@ -337,15 +337,15 @@ jobs:
   # 功能: Rust代码质量检查（Rustfmt + Clippy）
   # 输入: 无
   # 输出: status
-  # 执行条件: 始终执行
-  # 依赖: pre-build
+  # 执行条件: 始终执行（与pre-build并行）
+  # 依赖: 无
   # ================================================================================
   code-quality:
     name: P2 - Code Quality
-    needs: pre-build
     runs-on: ubuntu-22.04
     outputs:
       status: ${{ steps.quality-status.outputs.status }}
+    timeout-minutes: 30
     
     steps:
       - name: Start - Code Quality Check
@@ -353,39 +353,45 @@ jobs:
           echo "=============================================="
           echo "    Starting Code Quality Check                "
           echo "=============================================="
-      
+          echo "[INFO] Code quality check started at $(date)"
+
       - name: Checkout - Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
-      
+
       - name: Install - Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
           components: rustfmt, clippy
-      
+
       - name: Check - Rustfmt Formatting
+        id: rustfmt-check
         run: |
-          echo "Checking code formatting with Rustfmt..."
+          echo "[INFO] Checking code formatting with Rustfmt..."
           cargo fmt --check --manifest-path commercial/Cargo.toml
-      
+        continue-on-error: false
+
       - name: Check - Clippy Lints
+        id: clippy-check
         run: |
-          echo "Running Clippy static analysis..."
+          echo "[INFO] Running Clippy static analysis..."
           cargo clippy --manifest-path commercial/Cargo.toml -- -D warnings
-      
+        continue-on-error: false
+
       - name: Report - Quality Status
         id: quality-status
         run: |
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "P2 - Code Quality: PASSED"
-      
+          echo "[INFO] P2 - Code Quality: PASSED"
+
       - name: Complete - Code Quality Check
         run: |
           echo "=============================================="
           echo "    Code Quality Check Completed Successfully   "
           echo "=============================================="
+          echo "[INFO] Code quality check completed at $(date)"
 
   # ================================================================================
   # P3 - Linux 构建
@@ -394,13 +400,14 @@ jobs:
   # 输入: 无
   # 输出: status
   # 执行条件: 始终执行
-  # 依赖: pre-build (与code-quality并行执行)
+  # 依赖: pre-build, code-quality (两者都完成后才开始)
   # 并行: amd64, arm64v8, armv7 (最多5个并行)
   # ================================================================================
   build-linux:
     name: P3 - Build Linux (${{ matrix.job.name }})
     needs: 
       - pre-build
+      - code-quality
     runs-on: ubuntu-22.04
     outputs:
       status: ${{ steps.build-status.outputs.status }}
@@ -503,13 +510,14 @@ jobs:
   # 输入: 无
   # 输出: status
   # 执行条件: 始终执行
-  # 依赖: pre-build
+  # 依赖: pre-build, code-quality (两者都完成后才开始)
   # 并行: 与build-linux并行执行
   # ================================================================================
   build-windows:
     name: P3 - Build Windows
     needs: 
       - pre-build
+      - code-quality
     runs-on: windows-2022
     outputs:
       status: ${{ steps.build-status.outputs.status }}
