@@ -142,9 +142,16 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       build_id: ${{ steps.build-id.outputs.build_id }}
-      git_tag: ${{ steps.vars.outputs.git_tag }}
-      deb_version: ${{ steps.vars.outputs.deb_version }}
-      build_type: ${{ steps.build-type.outputs.build_type }}
+      git_tag: ${{ steps.version-info.outputs.git_tag }}
+      full_version: ${{ steps.version-info.outputs.full_version }}
+      display_version: ${{ steps.version-info.outputs.display_version }}
+      deb_version: ${{ steps.version-info.outputs.deb_version }}
+      major: ${{ steps.version-info.outputs.major }}
+      minor: ${{ steps.version-info.outputs.minor }}
+      patch: ${{ steps.version-info.outputs.patch }}
+      build_type: ${{ steps.version-info.outputs.build_type }}
+      build_date: ${{ steps.version-info.outputs.build_date }}
+      commit_hash: ${{ steps.version-info.outputs.commit_hash }}
       should_deploy: ${{ steps.deploy-check.outputs.should_deploy }}
       should_build_deb: ${{ steps.artifact-control.outputs.should_build_deb }}
       should_build_base_image: ${{ steps.artifact-control.outputs.should_build_base_image }}
@@ -157,7 +164,6 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # 生成唯一构建ID: 时间戳-Git短SHA
       - name: Generate - Build ID
         id: build-id
         run: |
@@ -165,102 +171,103 @@ jobs:
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
 
-      # 提取版本信息: 从tag/手动输入/dev分支获取git_tag和deb_version
       - name: Extract - Version Information
-        id: vars
+        id: version-info
         run: |
-          # =============================================
-          # 优先级1: 从 Git Tag 提取（自动触发 - push tag）
-          # =============================================
+          BUILD_DATE=$(date +%Y%m%d)
+          COMMIT_HASH="${GITHUB_SHA::8}"
+          
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            T=${GITHUB_REF#refs/tags/}
-            echo "[INFO] Tag push detected: $T"
-          
-          # =============================================
-          # 优先级2: 从手动输入 version 提取（手动触发 branch_with_version）
-          # =============================================
-          elif [[ "${{ inputs.trigger_type }}" == "branch_with_version" ]] && [[ -n "${{ inputs.version }}" ]]; then
-            T="${{ inputs.version }}"
-            echo "[INFO] Manual trigger with version: $T"
-          
-          # =============================================
-          # 优先级3: 从手动选择 git_tag 提取（手动触发 tag）
-          # =============================================
-          elif [[ "${{ inputs.trigger_type }}" == "tag" ]] && [[ -n "${{ inputs.git_tag }}" ]]; then
-            T="${{ inputs.git_tag }}"
-            echo "[INFO] Manual tag trigger: $T"
-          
-          # =============================================
-          # 优先级4: 开发版本号（默认）
-          # =============================================
-          else
-            T="dev-${GITHUB_SHA::8}"
-            echo "[INFO] Development version: $T"
-          fi
-          
-          echo "git_tag=$T" >> $GITHUB_OUTPUT
-          echo "GIT_TAG=$T" >> $GITHUB_ENV
-          
-          # 统一标准化: 移除前缀
-          VERSION=${T#pro-v}
-          VERSION=${VERSION#pro-}
-          VERSION=${VERSION#v}
-          
-          # Debian 包版本必须以数字开头
-          # 如果版本以非数字开头（如 dev-），转换为有效格式
-          if [[ ! "$VERSION" =~ ^[0-9] ]]; then
-            DEBIAN_VERSION="0.0.$(date +%Y%m%d%H%M%S).${GITHUB_SHA::8}"
-            echo "[INFO] Converted to valid Debian version: $DEBIAN_VERSION"
-          else
-            DEBIAN_VERSION="$VERSION"
-          fi
-          
-          echo "deb_version=$DEBIAN_VERSION" >> $GITHUB_OUTPUT
-          echo "DEB_VERSION=$DEBIAN_VERSION" >> $GITHUB_ENV
-
-      # 判断构建类型: prod 或 dev
-      - name: Determine - Build Type
-        id: build-type
-        run: |
-          # 1. 确定触发类型
-          # 方式A: 自动触发 - push tag
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TRIGGER_MODE="auto_tag"
-            echo "[INFO] Trigger mode: auto_tag"
-          
-          # 方式B: 自动触发 - push branch
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            TRIGGER_MODE="auto_branch"
-            echo "[INFO] Trigger mode: auto_branch"
-          
-          # 方式C: 手动触发 - workflow_dispatch
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TRIGGER_MODE="manual"
-            echo "[INFO] Trigger mode: manual"
-          fi
-          
-          # 2. 确定构建类型
-          if [[ "$TRIGGER_MODE" == "auto_tag" ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            BASE_VERSION=${TAG_NAME#pro-v}
+            BASE_VERSION=${BASE_VERSION#pro-}
+            BASE_VERSION=${BASE_VERSION#v}
+            
+            IFS='.' read -r MAJOR MINOR PATCH REST <<< "$BASE_VERSION"
             BUILD_TYPE="prod"
-            echo "[INFO] Build type: $BUILD_TYPE (auto tag push)"
-          
-          elif [[ "$TRIGGER_MODE" == "auto_branch" ]]; then
+            FULL_VERSION="pro-v${MAJOR}.${MINOR}.${PATCH}"
+            DISPLAY_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            DEBIAN_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            
+            echo "[INFO] Tag push detected: $TAG_NAME"
+            echo "[INFO] Full version: $FULL_VERSION"
+            
+          elif [[ "${{ inputs.trigger_type }}" == "branch_with_version" ]] && [[ -n "${{ inputs.version }}" ]]; then
+            BASE_VERSION="${{ inputs.version }}"
+            BASE_VERSION=${BASE_VERSION#pro-v}
+            BASE_VERSION=${BASE_VERSION#pro-}
+            BASE_VERSION=${BASE_VERSION#v}
+            
+            IFS='.' read -r MAJOR MINOR PATCH REST <<< "$BASE_VERSION"
+            BUILD_TYPE="prod"
+            FULL_VERSION="pro-v${MAJOR}.${MINOR}.${PATCH}"
+            DISPLAY_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            DEBIAN_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            
+            echo "[INFO] Manual trigger with version: $FULL_VERSION"
+            
+          elif [[ "${{ inputs.trigger_type }}" == "tag" ]] && [[ -n "${{ inputs.git_tag }}" ]]; then
+            TAG_NAME="${{ inputs.git_tag }}"
+            BASE_VERSION=${TAG_NAME#pro-v}
+            BASE_VERSION=${BASE_VERSION#pro-}
+            BASE_VERSION=${BASE_VERSION#v}
+            
+            IFS='.' read -r MAJOR MINOR PATCH REST <<< "$BASE_VERSION"
+            BUILD_TYPE="prod"
+            FULL_VERSION="pro-v${MAJOR}.${MINOR}.${PATCH}"
+            DISPLAY_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            DEBIAN_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            
+            echo "[INFO] Manual tag trigger: $TAG_NAME"
+            
+          else
+            MAJOR="0"
+            MINOR="0"
+            PATCH="0"
             BUILD_TYPE="dev"
-            echo "[INFO] Build type: $BUILD_TYPE (auto branch push)"
-          
-          elif [[ "$TRIGGER_MODE" == "manual" ]]; then
-            if [[ "${{ inputs.trigger_type }}" == "branch_with_version" ]] || \
-               [[ "${{ inputs.trigger_type }}" == "tag" ]]; then
-              BUILD_TYPE="prod"
-              echo "[INFO] Build type: $BUILD_TYPE (manual: ${{ inputs.trigger_type }})"
-            else
-              BUILD_TYPE="dev"
-              echo "[INFO] Build type: $BUILD_TYPE (manual: ${{ inputs.trigger_type }})"
-            fi
+            FULL_VERSION="dev-v${MAJOR}.${MINOR}.${PATCH}.${BUILD_DATE}.${COMMIT_HASH}"
+            DISPLAY_VERSION="${FULL_VERSION}"
+            DEBIAN_VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD_DATE}.${COMMIT_HASH}"
+            
+            echo "[INFO] Development version: $FULL_VERSION"
           fi
           
+          echo "git_tag=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "display_version=$DISPLAY_VERSION" >> $GITHUB_OUTPUT
+          echo "deb_version=$DEBIAN_VERSION" >> $GITHUB_OUTPUT
+          echo "major=${MAJOR:-0}" >> $GITHUB_OUTPUT
+          echo "minor=${MINOR:-0}" >> $GITHUB_OUTPUT
+          echo "patch=${PATCH:-0}" >> $GITHUB_OUTPUT
           echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          
+          echo "GIT_TAG=$FULL_VERSION" >> $GITHUB_ENV
+          echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
+          echo "DISPLAY_VERSION=$DISPLAY_VERSION" >> $GITHUB_ENV
+          echo "DEB_VERSION=$DEBIAN_VERSION" >> $GITHUB_ENV
           echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
+
+      - name: Validate - Version Format
+        id: validate-version
+        run: |
+          VERSION="${{ steps.version-info.outputs.full_version }}"
+          VALID_VERSION_REGEX='^(pro-v|dev-v)[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+\.[a-f0-9]+)?$'
+          
+          if [[ ! "$VERSION" =~ $VALID_VERSION_REGEX ]]; then
+            echo "Error: Invalid version format: $VERSION"
+            echo "Expected format: pro-vX.Y.Z or dev-vX.Y.Z.date.commit"
+            exit 1
+          fi
+          
+          DEBIAN_VERSION="${{ steps.version-info.outputs.deb_version }}"
+          if [[ ! "$DEBIAN_VERSION" =~ ^[0-9] ]]; then
+            echo "Error: Debian version must start with digit: $DEBIAN_VERSION"
+            exit 1
+          fi
+          
+          echo "[INFO] Version format validation passed: $VERSION"
 
       # 判断是否需要部署
       - name: Determine - Deployment Status
@@ -851,21 +858,49 @@ jobs:
       
       - name: Pack - Linux Binaries
         run: |
-          mkdir -p release
+          mkdir -p release/linux
+          VERSION="${{ needs.pre-build.outputs.full_version }}"
           for arch in amd64 arm64v8 armv7; do
             cp artifacts/binaries-linux-$arch/rustdesk-pro release/rustdesk-pro-$arch
             chmod +x release/rustdesk-pro-$arch
-            zip release/rustdesk-pro-server-linux-$arch.zip release/rustdesk-pro-$arch
+            zip -9 release/linux/rustdesk-pro-server-${VERSION}-linux-${arch}.zip release/rustdesk-pro-${arch}
           done
       
       - name: Pack - Windows Binaries
         run: |
+          mkdir -p release/windows
+          VERSION="${{ needs.pre-build.outputs.full_version }}"
           cp artifacts/binaries-windows-x86_64/rustdesk-pro.exe release/
-          zip release/rustdesk-pro-server-windows-x86_64.zip release/rustdesk-pro.exe
+          zip -9 release/windows/rustdesk-pro-server-${VERSION}-windows-x86_64.zip release/rustdesk-pro.exe
       
       - name: Copy - Debian Packages
         run: |
-          cp artifacts/debian-package-*/rustdesk-pro-server-*.deb release/ 2>/dev/null || true
+          mkdir -p release/debian
+          cp artifacts/debian-package-*/rustdesk-pro-server-*.deb release/debian/ 2>/dev/null || true
+      
+      - name: Generate - Checksums
+        run: |
+          cd release
+          find . -type f \( -name "*.zip" -o -name "*.deb" \) | sort | while read file; do
+            sha256sum "$file" >> checksums.txt
+          done
+          cat checksums.txt
+      
+      - name: Generate - Build Info
+        run: |
+          cat > release/build-info.json << EOF
+          {
+            "product": "rustdesk-pro-server",
+            "version": "${{ needs.pre-build.outputs.full_version }}",
+            "debian_version": "${{ needs.pre-build.outputs.deb_version }}",
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ github.sha }}",
+            "git_tag": "${{ needs.pre-build.outputs.git_tag }}",
+            "build_type": "${{ needs.pre-build.outputs.build_type }}",
+            "ci_build_id": "${{ github.run_id }}",
+            "ci_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
       
       - name: List - Release Assets
         run: |
@@ -873,6 +908,9 @@ jobs:
           echo "              Release Assets                  "
           echo "=============================================="
           ls -la release/
+          ls -la release/linux/ 2>/dev/null || true
+          ls -la release/windows/ 2>/dev/null || true
+          ls -la release/debian/ 2>/dev/null || true
           echo "=============================================="
       
       - name: Create - GitHub Release
@@ -880,8 +918,11 @@ jobs:
         with:
           draft: true
           files: |
-            release/*.zip
-            release/*.deb
+            release/linux/*.zip
+            release/windows/*.zip
+            release/debian/*.deb
+            release/checksums.txt
+            release/build-info.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
