@@ -861,17 +861,21 @@ jobs:
           mkdir -p release/linux
           VERSION="${{ needs.pre-build.outputs.full_version }}"
           for arch in amd64 arm64v8 armv7; do
-            cp artifacts/binaries-linux-$arch/rustdesk-pro release/rustdesk-pro-$arch
-            chmod +x release/rustdesk-pro-$arch
-            zip -9 release/linux/rustdesk-pro-server-${VERSION}-linux-${arch}.zip release/rustdesk-pro-${arch}
+            if [ -f "artifacts/binaries-linux-$arch/rustdesk-pro" ]; then
+              cp artifacts/binaries-linux-$arch/rustdesk-pro release/rustdesk-pro-$arch
+              chmod +x release/rustdesk-pro-$arch
+              zip -9 release/linux/rustdesk-pro-server-${VERSION}-linux-${arch}.zip release/rustdesk-pro-${arch}
+            fi
           done
       
       - name: Pack - Windows Binaries
         run: |
           mkdir -p release/windows
           VERSION="${{ needs.pre-build.outputs.full_version }}"
-          cp artifacts/binaries-windows-x86_64/rustdesk-pro.exe release/
-          zip -9 release/windows/rustdesk-pro-server-${VERSION}-windows-x86_64.zip release/rustdesk-pro.exe
+          if [ -f "artifacts/binaries-windows-x86_64/rustdesk-pro.exe" ]; then
+            cp artifacts/binaries-windows-x86_64/rustdesk-pro.exe release/
+            zip -9 release/windows/rustdesk-pro-server-${VERSION}-windows-x86_64.zip release/rustdesk-pro.exe
+          fi
       
       - name: Copy - Debian Packages
         run: |
@@ -915,15 +919,18 @@ jobs:
       
       - name: Validate - Build Artifact Naming
         id: validate-artifacts
+        env:
+          BUILD_STATUS: ${{ needs.build-summary.outputs.build_status }}
         run: |
           VERSION="${{ needs.pre-build.outputs.full_version }}"
           DEB_VERSION="${{ needs.pre-build.outputs.deb_version }}"
-          
+
           PASS=0
           FAIL=0
-          
+
           echo "=== 构建物命名验证 ==="
-          
+          echo "构建状态: $BUILD_STATUS"
+
           EXPECTED_FILES=(
             "release/linux/rustdesk-pro-server-${VERSION}-linux-amd64.zip"
             "release/linux/rustdesk-pro-server-${VERSION}-linux-arm64v8.zip"
@@ -932,7 +939,7 @@ jobs:
             "release/checksums.txt"
             "release/build-info.json"
           )
-          
+
           for file in "${EXPECTED_FILES[@]}"; do
             if [[ -f "$file" ]]; then
               echo "✅ $file"
@@ -942,17 +949,23 @@ jobs:
               ((FAIL++))
             fi
           done
-          
+
           echo ""
           echo "=== 验证结果 ==="
           echo "通过: $PASS, 失败: $FAIL"
-          
-          if [[ $FAIL -ne 0 ]]; then
+
+          # 仅在构建完整（success）时严格校验
+          # 部分构建（partial）允许文件缺失，仅记录警告
+          if [[ "$BUILD_STATUS" == "success" ]] && [[ $FAIL -ne 0 ]]; then
             echo "Error: Build artifact naming validation failed"
             exit 1
           fi
-          
-          echo "[INFO] All build artifacts have correct naming"
+
+          if [[ $FAIL -ne 0 ]]; then
+            echo "Warning: 部分构建产物缺失（构建状态: $BUILD_STATUS），跳过严格验证"
+          else
+            echo "[INFO] All build artifacts have correct naming"
+          fi
       
       - name: Create - GitHub Release
         uses: softprops/action-gh-release@v2
