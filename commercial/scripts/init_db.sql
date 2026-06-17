@@ -44,8 +44,8 @@ CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices (user_id);
 CREATE INDEX IF NOT EXISTS idx_devices_organization ON devices (organization_id);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices (status);
 -- Composite indexes for common query patterns
-CREATE INDEX IF NOT EXISTS idx_devices_org_status ON devices (organization_id, status);
-CREATE INDEX IF NOT EXISTS idx_devices_org_approved ON devices (organization_id, approved);
+CREATE INDEX IF NOT EXISTS idx_devices_org_status ON devices (organization_id, status);     
+CREATE INDEX IF NOT EXISTS idx_devices_org_approved ON devices (organization_id, approved); 
 
 -- Audit logs table
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -68,7 +68,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_device_id ON audit_logs (device_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at);
 -- Composite indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_audit_logs_type_created ON audit_logs (log_type, created_at);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created ON audit_logs (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created ON audit_logs (user_id, created_at); 
 
 -- Organizations table (for multi-tenancy support)
 CREATE TABLE IF NOT EXISTS organizations (
@@ -108,19 +108,6 @@ CREATE TABLE IF NOT EXISTS license (
     issued_at TEXT NOT NULL,
     is_trial INTEGER NOT NULL DEFAULT 0,
     is_active INTEGER NOT NULL DEFAULT 1
-);
-
--- Insert default admin user (password: admin123)
--- Password hash is bcrypt hash of 'admin123'
-INSERT OR IGNORE INTO users (id, username, email, password_hash, role, created_at, is_active)
-VALUES (
-    'admin-001',
-    'admin',
-    'admin@rustdesk.local',
-    '$2y$13$LQv3c1yqBWVHxkd0LQv3c1yqBWVHxkd0LQv3c1yqBWVHxkd0LQv3c',
-    'admin',
-    datetime('now'),
-    1
 );
 
 -- Insert default organization

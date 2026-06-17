@@ -242,6 +242,7 @@ pub async fn start_server(state: AppState, port: u16) -> anyhow::Result<()> {
 
     // Public routes (no authentication required)
     let public_routes = Router::new()
+        .route("/", get(root_handler))
         .route("/health", get(health_check))
         .route("/api/auth/login", post(login))
         .route("/api/auth/validate", post(validate_token))

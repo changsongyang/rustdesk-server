@@ -7,6 +7,7 @@ pub mod metrics;
 pub mod user;
 pub mod web;
 
+use sqlx::SqlitePool;
 use std::sync::Arc;
 
 pub use audit::AuditLogger;
@@ -24,6 +25,7 @@ pub struct AppState {
     pub audit_logger: Arc<AuditLogger>,
     pub cache: Arc<CacheManager<String, String>>,
     pub metrics: Arc<MetricsCollector>,
+    pub db_pool: Arc<SqlitePool>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -33,17 +35,17 @@ impl std::fmt::Debug for AppState {
 }
 
 impl AppState {
-    #[allow(clippy::let_underscore_future)]
     pub async fn new() -> Self {
-        let _ = db::init_database();
+        let db_pool = Arc::new(db::init_database().await.expect("Failed to initialize database"));
 
         Self {
             license_manager: Arc::new(LicenseManager::new().await),
-            user_manager: Arc::new(UserManager::new().await),
-            device_manager: Arc::new(DeviceManager::new().await),
-            audit_logger: Arc::new(AuditLogger::new().await),
+            user_manager: Arc::new(UserManager::new(db_pool.clone()).await),
+            device_manager: Arc::new(DeviceManager::new(db_pool.clone()).await),
+            audit_logger: Arc::new(AuditLogger::new(db_pool.clone()).await),
             cache: Arc::new(CacheManager::new(1000)),
             metrics: Arc::new(MetricsCollector::new()),
+            db_pool,
         }
     }
 }

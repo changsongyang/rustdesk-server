@@ -1,59 +1,16 @@
 use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
+use std::sync::Arc;
 
 use super::{errors::DeviceError, models::*};
 
 pub struct DeviceManager {
-    pool: SqlitePool,
+    pool: Arc<SqlitePool>,
 }
 
 impl DeviceManager {
-    pub async fn new() -> Self {
-        let db_path =
-            std::env::var("PRO_DB_URL").unwrap_or_else(|_| "./data/rustdesk_pro.db".to_string());
-
-        // Ensure parent directory exists
-        if let Some(parent) = std::path::Path::new(&db_path).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        let pool = SqlitePool::connect(&format!("sqlite:{}", db_path))
-            .await
-            .expect("Failed to connect to database");
-
-        Self::create_tables(&pool).await;
-
+    pub async fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
-    }
-
-    async fn create_tables(pool: &SqlitePool) {
-        let _ = sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS devices (
-                id TEXT PRIMARY KEY NOT NULL,
-                device_id TEXT NOT NULL UNIQUE,
-                name TEXT NOT NULL,
-                hostname TEXT,
-                os_type TEXT,
-                os_version TEXT,
-                ip_address TEXT,
-                status TEXT NOT NULL DEFAULT 'offline',
-                user_id TEXT,
-                organization_id TEXT,
-                approved INTEGER NOT NULL DEFAULT 0,
-                approved_by TEXT,
-                approved_at TEXT,
-                last_online TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices (device_id);
-            CREATE INDEX IF NOT EXISTS idx_devices_organization ON devices (organization_id);
-            CREATE INDEX IF NOT EXISTS idx_devices_status ON devices (status);
-            "#,
-        )
-        .execute(pool)
-        .await;
     }
 
     pub async fn create_device(
@@ -63,7 +20,7 @@ impl DeviceManager {
     ) -> Result<Device, DeviceError> {
         let existing = sqlx::query("SELECT id FROM devices WHERE device_id = ?")
             .bind(&request.device_id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?;
 
@@ -96,7 +53,7 @@ impl DeviceManager {
         .bind(0)
         .bind(now.to_rfc3339())
         .bind(now.to_rfc3339())
-        .execute(&self.pool)
+        .execute(&*self.pool)
         .await
         .map_err(|e| DeviceError::DatabaseError(e.to_string()))?;
 
@@ -106,7 +63,7 @@ impl DeviceManager {
     pub async fn get_device(&self, id: &str) -> Result<Device, DeviceError> {
         let row = sqlx::query("SELECT * FROM devices WHERE id = ?")
             .bind(id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?
             .ok_or(DeviceError::NotFound)?;
@@ -117,7 +74,7 @@ impl DeviceManager {
     pub async fn get_device_by_device_id(&self, device_id: &str) -> Result<Device, DeviceError> {
         let row = sqlx::query("SELECT * FROM devices WHERE device_id = ?")
             .bind(device_id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?
             .ok_or(DeviceError::NotFound)?;
@@ -201,7 +158,7 @@ impl DeviceManager {
         query_builder = query_builder.bind(id);
 
         let result = query_builder
-            .execute(&self.pool)
+            .execute(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?;
 
@@ -215,7 +172,7 @@ impl DeviceManager {
     pub async fn delete_device(&self, id: &str) -> Result<(), DeviceError> {
         let result = sqlx::query("DELETE FROM devices WHERE id = ?")
             .bind(id)
-            .execute(&self.pool)
+            .execute(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?;
 
@@ -256,7 +213,7 @@ impl DeviceManager {
         }
 
         let rows = query_builder
-            .fetch_all(&self.pool)
+            .fetch_all(&*self.pool)
             .await
             .map_err(|e| DeviceError::DatabaseError(e.to_string()))?;
 

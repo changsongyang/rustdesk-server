@@ -1,56 +1,17 @@
 use chrono::{DateTime, Utc};
 use serde_json;
 use sqlx::{Row, SqlitePool};
+use std::sync::Arc;
 
 use super::{errors::AuditError, models::*};
 
 pub struct AuditLogger {
-    pool: SqlitePool,
+    pool: Arc<SqlitePool>,
 }
 
 impl AuditLogger {
-    pub async fn new() -> Self {
-        let db_path =
-            std::env::var("PRO_DB_URL").unwrap_or_else(|_| "./data/rustdesk_pro.db".to_string());
-
-        // Ensure parent directory exists
-        if let Some(parent) = std::path::Path::new(&db_path).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        let pool = SqlitePool::connect(&format!("sqlite:{}", db_path))
-            .await
-            .expect("Failed to connect to database");
-
-        Self::create_tables(&pool).await;
-
+    pub async fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
-    }
-
-    async fn create_tables(pool: &SqlitePool) {
-        let _ = sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id TEXT PRIMARY KEY NOT NULL,
-                log_type TEXT NOT NULL,
-                action TEXT NOT NULL,
-                user_id TEXT,
-                username TEXT,
-                device_id TEXT,
-                device_name TEXT,
-                ip_address TEXT,
-                user_agent TEXT,
-                details TEXT,
-                created_at TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_type ON audit_logs (log_type);
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id);
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_device ON audit_logs (device_id);
-            CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at);
-            "#,
-        )
-        .execute(pool)
-        .await;
     }
 
     pub async fn log(&self, request: AuditLogRequest) -> Result<AuditLog, AuditError> {
@@ -84,7 +45,7 @@ impl AuditLogger {
         .bind(&request.user_agent)
         .bind(&details_str)
         .bind(now.to_rfc3339())
-        .execute(&self.pool)
+        .execute(&*self.pool)
         .await
         .map_err(|e| AuditError::DatabaseError(e.to_string()))?;
 
@@ -94,7 +55,7 @@ impl AuditLogger {
     pub async fn get_log(&self, id: &str) -> Result<AuditLog, AuditError> {
         let row = sqlx::query("SELECT * FROM audit_logs WHERE id = ?")
             .bind(id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(&*self.pool)
             .await
             .map_err(|e| AuditError::DatabaseError(e.to_string()))?
             .ok_or(AuditError::NotFound)?;
@@ -159,7 +120,7 @@ impl AuditLogger {
         }
 
         let rows = query_builder
-            .fetch_all(&self.pool)
+            .fetch_all(&*self.pool)
             .await
             .map_err(|e| AuditError::DatabaseError(e.to_string()))?;
 

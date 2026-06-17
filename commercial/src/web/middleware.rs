@@ -3,7 +3,6 @@ use axum::{
     http::{Request, StatusCode},
     middleware::Next,
     response::Response,
-    Extension,
 };
 
 use crate::user::models::UserInfo;
@@ -15,7 +14,7 @@ pub async fn auth_middleware(req: Request<Body>, next: Next) -> Result<Response,
     // Get state from extensions
     let state = req
         .extensions()
-        .get::<Extension<AppState>>()
+        .get::<AppState>()
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if let Some(header) = auth_header {
@@ -58,7 +57,7 @@ pub async fn optional_auth_middleware(
     if let Some(header) = auth_header {
         let state = req
             .extensions()
-            .get::<Extension<AppState>>()
+            .get::<AppState>()
             .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
         let token = header.to_str().map_err(|_| StatusCode::BAD_REQUEST)?;

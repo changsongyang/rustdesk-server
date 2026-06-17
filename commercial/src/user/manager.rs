@@ -4,6 +4,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use super::{errors::UserError, models::*};
 
@@ -18,60 +19,12 @@ struct Claims {
 }
 
 pub struct UserManager {
-    pool: SqlitePool,
+    pool: Arc<SqlitePool>,
 }
 
 impl UserManager {
-    pub async fn new() -> Self {
-        let db_path =
-            std::env::var("PRO_DB_URL").unwrap_or_else(|_| "./data/rustdesk_pro.db".to_string());
-
-        // Ensure parent directory exists
-        if let Some(parent) = std::path::Path::new(&db_path).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        // Convert to absolute path if relative
-        let db_path = if db_path.starts_with('/') || db_path.starts_with("C:") {
-            db_path.clone()
-        } else {
-            std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."))
-                .join(&db_path)
-                .to_string_lossy()
-                .to_string()
-        };
-
-        let pool = SqlitePool::connect(&format!("sqlite:{}", db_path))
-            .await
-            .expect("Failed to connect to database");
-
-        Self::create_tables(&pool).await;
-
+    pub async fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
-    }
-
-    async fn create_tables(pool: &SqlitePool) {
-        let _ = sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY NOT NULL,
-                username TEXT NOT NULL UNIQUE,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'viewer',
-                organization_id TEXT,
-                created_at TEXT NOT NULL,
-                last_login TEXT,
-                is_active INTEGER NOT NULL DEFAULT 1
-            );
-            CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
-            CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
-            CREATE INDEX IF NOT EXISTS idx_users_organization ON users (organization_id);
-            "#,
-        )
-        .execute(pool)
-        .await;
     }
 
     pub async fn create_user(&self, request: UserCreateRequest) -> Result<UserInfo, UserError> {
@@ -86,7 +39,7 @@ impl UserManager {
             sqlx::query("SELECT username, email FROM users WHERE username = ? OR email = ?")
                 .bind(&request.username)
                 .bind(&request.email)
-                .fetch_optional(&self.pool)
+                .fetch_optional(&*self.pool)
                 .await
                 .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -120,7 +73,7 @@ impl UserManager {
         .bind(role.to_str())
         .bind(&request.organization_id)
         .bind(&created_at)
-        .execute(&self.pool)
+        .execute(&*self.pool)
         .await
         .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -138,7 +91,7 @@ impl UserManager {
             "SELECT id, username, email, role, organization_id FROM users WHERE id = ?",
         )
         .bind(id)
-        .fetch_one(&self.pool)
+        .fetch_one(&*self.pool)
         .await
         .map_err(|_| UserError::NotFound)?;
 
@@ -156,7 +109,7 @@ impl UserManager {
             "SELECT id, username, email, role, organization_id FROM users WHERE username = ?",
         )
         .bind(username)
-        .fetch_one(&self.pool)
+        .fetch_one(&*self.pool)
         .await
         .map_err(|_| UserError::NotFound)?;
 
@@ -200,7 +153,7 @@ impl UserManager {
         .bind(&organization_id)
         .bind(is_active as i32)
         .bind(id)
-        .execute(&self.pool)
+        .execute(&*self.pool)
         .await
         .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -210,7 +163,7 @@ impl UserManager {
     pub async fn delete_user(&self, id: &str) -> Result<(), UserError> {
         let result = sqlx::query("DELETE FROM users WHERE id = ?")
             .bind(id)
-            .execute(&self.pool)
+            .execute(&*self.pool)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 
@@ -230,12 +183,12 @@ impl UserManager {
                 "SELECT id, username, email, role, organization_id FROM users WHERE organization_id = ?"
             )
             .bind(org_id)
-            .fetch_all(&self.pool)
+            .fetch_all(&*self.pool)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?
         } else {
             sqlx::query("SELECT id, username, email, role, organization_id FROM users")
-                .fetch_all(&self.pool)
+                .fetch_all(&*self.pool)
                 .await
                 .map_err(|e| UserError::DatabaseError(e.to_string()))?
         };
@@ -260,7 +213,7 @@ impl UserManager {
             "SELECT id, username, email, password_hash, role, organization_id, is_active FROM users WHERE username = ?"
         )
         .bind(&request.username)
-        .fetch_one(&self.pool)
+        .fetch_one(&*self.pool)
         .await
         .map_err(|_| UserError::InvalidCredentials)?;
 
@@ -315,7 +268,7 @@ impl UserManager {
         let _ = sqlx::query("UPDATE users SET last_login = ? WHERE id = ?")
             .bind(Utc::now().to_rfc3339())
             .bind(&user.id)
-            .execute(&self.pool)
+            .execute(&*self.pool)
             .await;
 
         Ok(UserLoginResponse { token, user })
@@ -339,7 +292,7 @@ impl UserManager {
         sqlx::query("UPDATE users SET last_login = ? WHERE id = ?")
             .bind(Utc::now().to_rfc3339())
             .bind(user_id)
-            .execute(&self.pool)
+            .execute(&*self.pool)
             .await
             .map_err(|e| UserError::DatabaseError(e.to_string()))?;
 

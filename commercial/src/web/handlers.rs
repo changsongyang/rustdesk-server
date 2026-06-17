@@ -10,6 +10,24 @@ use crate::device::models::*;
 use crate::user::models::*;
 use crate::AppState;
 
+// ==================== Root Handler ====================
+
+pub async fn root_handler() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "RustDesk Pro Server API",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "health": "/health",
+            "auth": {
+                "login": "POST /api/auth/login",
+                "validate": "POST /api/auth/validate"
+            }
+        })),
+    )
+}
+
 // ==================== Health Check ====================
 
 pub async fn health_check() -> impl IntoResponse {
